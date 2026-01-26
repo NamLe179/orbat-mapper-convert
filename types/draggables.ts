@@ -1,46 +1,85 @@
-import type { OrbatTreeItem } from "@/components/orbat/types.ts";
-import type { Position } from "geojson";
-import type { ForceSide } from "@orbat-mapper/msdllib";
+import type {
+  NScenarioFeature,
+  NScenarioLayer,
+  NSide,
+  NSideGroup,
+  NUnit,
+} from "@/types/internalModels";
+import type { Edge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 
-export type UnitDragItemSource = "orbatTree" | "breadcrumbs";
+export type ItemState =
+  | { type: "idle" }
+  | { type: "dragging" }
+  | { type: "drag-over"; closestEdge: Edge | null };
 
+export const idle = { type: "idle" } as const;
+
+// Symbols are used to ensure uniqueness and prevent naming collisions
+// when identifying drag items. This works perfectly in Next.js Client Components.
+const privateKey = Symbol("scenarioFeature");
+const _scnFeatureLayerKey = Symbol("scenarioFeatureLayer");
 const privateUnitDragKey = Symbol("unit");
-const privateEquipmentDragKey = Symbol("equipmentItem");
-const privatePositionDragKey = Symbol("position");
-const privateSideDragKey = Symbol("side");
+const privateSideKey = Symbol("side");
+const privateSideGroupKey = Symbol("sideGroup");
 
-export type SideDragItem = {
-  [privateSideDragKey]: boolean;
-  item: ForceSide;
+export type UnitDragItemSource = "orbatTree" | "breadcrumbs" | "detailsPanel";
+
+export type ScenarioFeatureDragItem = {
+  [privateKey]: boolean;
+  feature: NScenarioFeature;
 };
 
-export type PositionDropItem = {
-  [privatePositionDragKey]: boolean;
-  position: Position;
+export type ScenarioFeatureLayerDragItem = {
+  [_scnFeatureLayerKey]: boolean;
+  layer: NScenarioLayer;
 };
 
 export type UnitDragItem = {
   [privateUnitDragKey]: boolean;
-  item: OrbatTreeItem;
+  unit: NUnit;
   source?: UnitDragItemSource;
 };
 
-export type EquipmentItemDragItem = {
-  [privateEquipmentDragKey]: boolean;
-  item: OrbatTreeItem;
+export type SideGroupDragItem = {
+  [privateSideGroupKey]: boolean;
+  sideGroup: NSideGroup;
 };
 
-export type OrbatDragItem = UnitDragItem | EquipmentItemDragItem | SideDragItem;
+export type SideDragItem = {
+  [privateSideKey]: boolean;
+  side: NSide;
+};
 
-export function getSideDragItem(data: Omit<SideDragItem, typeof privateSideDragKey>): SideDragItem {
+// --- Factory Functions & Type Guards ---
+
+export function getSideDragItem(
+  data: Omit<SideDragItem, typeof privateSideKey>,
+): SideDragItem {
   return {
-    [privateSideDragKey]: true,
+    [privateSideKey]: true,
     ...data,
   };
 }
 
-export function isSideDragItem(data: Record<string | symbol, unknown>): data is SideDragItem {
-  return Boolean(data[privateSideDragKey]);
+export function isSideDragItem(
+  data: Record<string | symbol, unknown>,
+): data is SideDragItem {
+  return Boolean(data[privateSideKey]);
+}
+
+export function getSideGroupDragItem(
+  data: Omit<SideGroupDragItem, typeof privateSideGroupKey>,
+): SideGroupDragItem {
+  return {
+    [privateSideGroupKey]: true,
+    ...data,
+  };
+}
+
+export function isSideGroupDragItem(
+  data: Record<string | symbol, unknown>,
+): data is SideGroupDragItem {
+  return Boolean(data[privateSideGroupKey]);
 }
 
 export function getUnitDragItem(
@@ -54,46 +93,38 @@ export function getUnitDragItem(
   };
 }
 
-export function isOrbatItemDragItem(data: Record<string | symbol, unknown>): data is OrbatDragItem {
-  return isUnitDragItem(data) || isEquipmentItemDragItem(data) || isSideDragItem(data);
-}
-
-export function isUnitOrEquipmentItemDragItem(
+export function isUnitDragItem(
   data: Record<string | symbol, unknown>,
-): data is UnitDragItem | EquipmentItemDragItem {
-  return isUnitDragItem(data) || isEquipmentItemDragItem(data);
-}
-
-export function isUnitDragItem(data: Record<string | symbol, unknown>): data is UnitDragItem {
+): data is UnitDragItem {
   return Boolean(data[privateUnitDragKey]);
 }
 
-export function getEquipmentItemDragItem(
-  data: Omit<EquipmentItemDragItem, typeof privateEquipmentDragKey>,
-): EquipmentItemDragItem {
+export function getScenarioFeatureDragItem(
+  data: Omit<ScenarioFeatureDragItem, typeof privateKey>,
+): ScenarioFeatureDragItem {
   return {
-    [privateEquipmentDragKey]: true,
+    [privateKey]: true,
     ...data,
   };
 }
 
-export function isEquipmentItemDragItem(
+export function isScenarioFeatureDragItem(
   data: Record<string | symbol, unknown>,
-): data is EquipmentItemDragItem {
-  return Boolean(data[privateEquipmentDragKey]);
+): data is ScenarioFeatureDragItem {
+  return Boolean(data[privateKey]);
 }
 
-export function getPositionDropItem(
-  data: Omit<PositionDropItem, typeof privatePositionDragKey>,
-): PositionDropItem {
+export function getScenarioFeatureLayerDragItem(
+  data: Omit<ScenarioFeatureLayerDragItem, typeof _scnFeatureLayerKey>,
+): ScenarioFeatureLayerDragItem {
   return {
-    [privatePositionDragKey]: true,
+    [_scnFeatureLayerKey]: true,
     ...data,
   };
 }
 
-export function isPositionDropItem(
+export function isScenarioFeatureLayerDragItem(
   data: Record<string | symbol, unknown>,
-): data is PositionDropItem {
-  return Boolean(data[privatePositionDragKey]);
+): data is ScenarioFeatureLayerDragItem {
+  return Boolean(data[_scnFeatureLayerKey]);
 }

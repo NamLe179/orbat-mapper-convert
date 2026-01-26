@@ -1,0 +1,317 @@
+import { klona } from "klona";
+
+// Project imports (đã bỏ đuôi .ts)
+import type { Unit, UnitStatus } from "@/types/scenarioModels";
+import type { TScenario } from "@/scenariostore";
+import type { EntityId } from "@/types/base";
+import type {
+  NState,
+  NUnitAdd,
+  NUnitEquipment,
+  NUnitPersonnel,
+  NUnitSupply,
+} from "@/types/internalModels";
+import { createNameToIdMapObject, nanoid } from "@/utils";
+import {
+  convertStateToInternalFormat,
+  type ScenarioState,
+} from "@/scenariostore/newScenarioStore";
+import type { RangeRing } from "@/types/scenarioGeoModels";
+import { getCustomSymbolId, setSid } from "@/symbology/helpers";
+
+export type OrbatToTextOptions = {
+  indent?: string;
+};
+
+/**
+ * Chuyển đổi cấu trúc cây Unit thành dạng text (indentation based).
+ */
+export function orbatToText(root: Unit, options: OrbatToTextOptions = {}): string[] {
+  const indent = options.indent ?? "\t";
+  const result: string[] = [];
+
+  function helper(node: Unit, depth: number = 0) {
+    result.push(indent.repeat(depth) + node.name + "\n");
+    node.subUnits?.forEach((child: any) => helper(child, depth + 1));
+  }
+
+  helper(root);
+  return result;
+}
+
+/**
+ * Parse text JSON thành mảng Unit.
+ */
+export function parseApplicationOrbat(text: string): Unit[] | null {
+  try {
+    const obj = JSON.parse(text);
+    if (Array.isArray(obj)) {
+      return obj;
+    }
+    return null;
+  } catch (e) {
+    console.error("Failed to parse application orbat", e);
+    return null;
+  }
+}
+
+type AddUnitHierarchyOptions = {
+  newIds?: boolean;
+  includeState?: boolean;
+  sourceState?: ScenarioState;
+};
+
+/**
+ * Hàm core để import/merge một cây đơn vị vào Scenario hiện tại.
+ * * @param rootUnit Unit gốc cần import
+ * @param parentId ID của đơn vị cha sẽ chứa unit mới
+ * @param targetScenario Store đích (React wrapper store)
+ * @param options Tùy chọn import
+ */
+export function addUnitHierarchy(
+  rootUnit: Unit,
+  parentId: EntityId,
+  targetScenario: TScenario,
+  options: AddUnitHierarchyOptions = {},
+) {
+  const newIds = options.newIds ?? true;
+  const includeState = options.includeState ?? false;
+  const noUndo = true;
+  
+  const { store, unitActions } = targetScenario;
+  const { sourceState } = options;
+  const { side } = unitActions.getUnitHierarchy(parentId);
+  
+  // Snapshot dữ liệu hiện tại để map ID (giả định store.state truy cập được state hiện tại)
+  const tempUnitStatusIdMap = createNameToIdMapObject(store.state.unitStatusMap);
+  const supplyNameToIdMap = createNameToIdMapObject(store.state.supplyCategoryMap);
+  const equipmentNameToIdMap = createNameToIdMapObject(store.state.equipmentMap);
+  const personnelNameToIdMap = createNameToIdMapObject(store.state.personnelMap);
+  
+  const sourceSupplyNameToIdMap = createNameToIdMapObject(
+    sourceState?.supplyCategoryMap ?? {},
+  );
+  const targetSupplyUomNameToIdMap = createNameToIdMapObject(store.state.supplyUomMap);
+  const targetSupplyClassMap = createNameToIdMapObject(store.state.supplyClassMap);
+  const sourceCustomSymbolIds = new Set<string>();
+
+  // Thực hiện update state (Yêu cầu store hỗ trợ Immer producer)
+  store.update((s) => {
+    function addUnitStatus(unitStatus: UnitStatus) {
+      const id = nanoid();
+      tempUnitStatusIdMap[unitStatus.name] = id;
+      s.unitStatusMap[id] = { ...unitStatus, id };
+      return id;
+    }
+
+    function helper(unit: Unit, parentId: EntityId, depth: number = 0) {
+      const equipment: NUnitEquipment[] = [];
+      const personnel: NUnitPersonnel[] = [];
+      const rangeRings: RangeRing[] = [];
+      const supplies: NUnitSupply[] = [];
+      
+      const customSymbolId = getCustomSymbolId(unit.sidc);
+      if (customSymbolId) {
+        sourceCustomSymbolIds.add(customSymbolId);
+      }
+      
+      unit.state
+        ?.filter((st) => st.sidc)
+        ?.forEach((st) => {
+          const csidc = getCustomSymbolId(st.sidc!);
+          if (csidc) {
+            sourceCustomSymbolIds.add(csidc);
+          }
+        });
+
+      // Handle Equipment
+      unit.equipment?.forEach(({ name, count, onHand }) => {
+        const { id } =
+          s.equipmentMap[name] ||
+          unitActions.addEquipment({ id: name, name }, { noUndo, s });
+        equipment.push({ id, count, onHand });
+      });
+
+      // Handle Personnel
+      unit.personnel?.forEach(({ name, count, onHand }) => {
+        const { id } =
+          s.personnelMap[name] ||
+          unitActions.addPersonnel({ id: name, name }, { noUndo, s });
+        personnel.push({ id, count, onHand });
+      });
+
+      // Handle Supplies (Complex logic due to Categories, UOMs, Classes)
+      unit.supplies?.forEach((unitSupply) => {
+        // use existing one if it exists. For new supplies we use the name as id
+        let supplyId =
+          supplyNameToIdMap[unitSupply.name] ??
+          s.supplyCategoryMap[unitSupply.name ?? ""]?.id;
+          
+        if (!supplyId) {
+          // the supply category does not exist, create it. Use the source state if available
+          const newSupplyCategory = sourceState?.supplyCategoryMap[
+            sourceSupplyNameToIdMap[unitSupply.name]
+          ] ?? {
+            id: unitSupply.name,
+            name: unitSupply.name,
+          };
+
+          let uomId: string | undefined = undefined;
+          if (newSupplyCategory.uom) {
+            const sourceUom = sourceState?.supplyUomMap[newSupplyCategory.uom];
+            // does the uom name exist in the target scenario?
+            uomId = targetSupplyUomNameToIdMap[sourceUom?.name ?? ""];
+            if (sourceUom && !uomId) {
+              uomId = unitActions.addSupplyUom({ ...sourceUom, id: sourceUom.name });
+            }
+          }
+
+          let supplyClassId: string | undefined = undefined;
+          if (newSupplyCategory.supplyClass) {
+            const sourceSupplyClass =
+              sourceState?.supplyClassMap[newSupplyCategory.supplyClass];
+            supplyClassId = targetSupplyClassMap[sourceSupplyClass?.name ?? ""];
+            if (sourceSupplyClass && !supplyClassId) {
+              supplyClassId = unitActions.addSupplyClass({
+                ...sourceSupplyClass,
+                id: sourceSupplyClass.name,
+              });
+            }
+
+            const sc = unitActions.addSupplyCategory(
+              {
+                ...newSupplyCategory,
+                id: newSupplyCategory.name,
+                uom: uomId,
+                supplyClass: supplyClassId,
+              },
+              { noUndo, s },
+            );
+            supplyId = sc.id;
+          }
+        }
+
+        supplies.push({ ...unitSupply, id: supplyId });
+      });
+
+      // Handle Range Rings
+      unit.rangeRings?.forEach((rr) => {
+        const { group, ...rest } = rr;
+        if (group) {
+          let groupId = group
+            ? Object.values(s.rangeRingGroupMap).find((g) => g.name === group)?.id
+            : "";
+          if (!groupId) {
+            groupId = nanoid();
+            s.rangeRingGroupMap[groupId] = { id: groupId, name: group };
+          }
+          rangeRings.push({ ...rest, group: groupId });
+        } else {
+          rangeRings.push(rr);
+        }
+      });
+
+      // Handle Unit State History
+      const unitState =
+        includeState && unit.state
+          ? [...unit.state].map((st) =>
+              newIds
+                ? convertStateToInternalFormat({ ...st, id: "" })
+                : convertStateToInternalFormat(st),
+            )
+          : [];
+
+      unitState
+        .filter((st) => st.status)
+        .forEach((st) => {
+          st.status = tempUnitStatusIdMap[st.status!] || addUnitStatus({ name: st.status! });
+        });
+
+      const internalUnitState: NState[] = unitState.map((st) => {
+        const { update, diff, ...rest } = st;
+        const newUpdate = update
+          ? {
+              equipment: update.equipment?.map((e) => {
+                const { name, ...restE } = e;
+                return { id: equipmentNameToIdMap[name] ?? name, ...restE };
+              }),
+              personnel: update.personnel?.map((p) => {
+                const { name, ...restP } = p;
+                return { id: personnelNameToIdMap[name] ?? name, ...restP };
+              }),
+              supplies: update.supplies?.map((supp) => {
+                const { name, ...restS } = supp;
+                return { id: supplyNameToIdMap[name] ?? name, ...restS };
+              }),
+            }
+          : undefined;
+        const newDiff = diff
+          ? {
+              equipment: diff.equipment?.map((e) => {
+                const { name, ...restE } = e;
+                return { id: equipmentNameToIdMap[name] ?? name, ...restE };
+              }),
+              personnel: diff.personnel?.map((p) => {
+                const { name, ...restP } = p;
+                return { id: personnelNameToIdMap[name] ?? name, ...restP };
+              }),
+              supplies: diff.supplies?.map((supp) => {
+                const { name, ...restS } = supp;
+                return { id: supplyNameToIdMap[name] ?? name, ...restS };
+              }),
+            }
+          : undefined;
+        return {
+          ...rest,
+          update: newUpdate,
+          diff: newDiff,
+        };
+      });
+
+      let status = undefined;
+      if (unit.status) {
+        status = tempUnitStatusIdMap[unit.status] || addUnitStatus({ name: unit.status });
+      }
+
+      // ID Generation
+      let id = newIds ? nanoid() : (unit.id ?? nanoid());
+      if (id in s.unitMap) {
+        console.warn(
+          `Unit ${unit.name} with id ${id} already exists in the scenario. Creating new id.`,
+        );
+        id = nanoid();
+      }
+
+      const newUnit: NUnitAdd = {
+        ...unit,
+        id,
+        sidc: setSid(unit.sidc, side.standardIdentity),
+        subUnits: [],
+        equipment,
+        personnel,
+        supplies,
+        state: internalUnitState,
+        rangeRings: rangeRings,
+        status,
+      };
+
+      // Add unit to store
+      unitActions.addUnit(newUnit, parentId, undefined, { noUndo, s });
+      
+      // Recursion
+      unit.subUnits?.forEach((child) => helper(child, newUnit.id!));
+    }
+
+    helper(rootUnit, parentId);
+    
+    // Copy over custom symbols used by the source scenario
+    sourceCustomSymbolIds.forEach((csid) => {
+      if (!s.customSymbolMap[csid]) {
+        const sourceSymbol = sourceState?.customSymbolMap[csid];
+        if (sourceSymbol) {
+          s.customSymbolMap[csid] = klona(sourceSymbol);
+        }
+      }
+    });
+  });
+}

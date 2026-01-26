@@ -1,44 +1,25 @@
-export interface SymbolValue {
+export type SymbolSetMap = Record<string, SymbolSet>;
+
+export interface SymbolSet {
+  symbolSet: string;
+  name: string;
+  mainIcon: MainIconEntity[];
+  modifierOne: ModifierEntity[];
+  modifierTwo: ModifierEntity[];
+}
+
+export interface MainIconEntity {
   code: string;
-  text: string;
-}
-
-export interface SymbolItem extends SymbolValue {
-  sidc: string;
-  entity?: string;
+  entity: string;
   entityType?: string;
-  entitySubtype?: string | null;
-}
-
-export interface NullableSymbolItem extends Omit<SymbolItem, "code"> {
-  code: string | null;
-}
-
-export interface NormalizedNode {
-  hierarchy: string;
-  names: string[];
-  codingscheme: string;
-  affiliation: string;
-  battledimension: string;
-  status: string;
-  functionid: string;
-  name: string;
-  remarks: string;
-  geometry: string | null;
-  text: string;
-  category: "WARFIGHTING" | "TACTICAL GRAPHICS";
-}
-
-export interface NodeRevB {
+  entitySubtype?: string;
+  remarks?: string;
   geometry?: string;
-  text: string;
-  names: string[];
-  name: string;
-  hierarchy: string;
-  codingscheme: string;
-  affiliation: string;
-  battledimension: string;
-  status: string;
-  functionid: string;
-  remarks: string;
+}
+
+export interface ModifierEntity {
+  code: string;
+  category?: string;
+  modifier: string;
+  remarks?: string;
 }

@@ -1,0 +1,113 @@
+import type { LayerFeatureItem } from "@/types/scenarioGeoModels";
+import type { NUnit, ScenarioEventType } from "@/types/internalModels";
+import type { ScenarioActions, SideAction, UnitAction } from "@/types/constants";
+import type { CurrentState, UnitSymbolOptions } from "@/types/scenarioModels";
+import type { EntityId } from "@/types/base";
+
+export interface ButtonGroupItem {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+export interface RadioGroupItemData<T = string> {
+  name: string;
+  description?: string;
+  value: T;
+}
+
+export interface SelectItem<T = string | number> {
+  label: string;
+  value: T;
+}
+
+export interface NewSelectItem<T = string | number> {
+  label: string;
+  value: T;
+  disabled?: boolean;
+  description?: string;
+}
+
+export interface SearchResult {
+  category: "Units" | "Features" | "Events" | "Places" | "Actions" | "Map layers";
+  index: number;
+  id: string | number;
+  score: number;
+  name: string;
+  highlight: string;
+}
+
+export interface UnitSearchResult extends SearchResult {
+  category: "Units";
+  sidc: string;
+  parent?: {
+    sidc: string;
+    name: string;
+    symbolOptions?: UnitSymbolOptions;
+  };
+  symbolOptions?: UnitSymbolOptions;
+  _state?: CurrentState;
+}
+
+export interface LayerFeatureSearchResult extends LayerFeatureItem, SearchResult {
+  category: "Features";
+}
+
+export interface MapLayerSearchResult extends SearchResult {
+  category: "Map layers";
+  type: "ImageLayer" | "TileJSONLayer";
+}
+
+export interface EventSearchResult extends SearchResult {
+  category: "Events";
+  id: EntityId;
+  _type: ScenarioEventType;
+  startTime: number;
+}
+
+export interface ActionSearchResult extends SearchResult {
+  category: "Actions";
+  action: ScenarioActions;
+  icon?: string;
+}
+
+export type DropTarget = "on" | "above" | "below";
+export type CloneTarget = "end" | "above" | "below";
+
+// REFACTOR: Converted Vue Emits to React Props Callback pattern
+export interface UnitEventProps {
+  onUnitAction?: (unit: NUnit, action: UnitAction) => void;
+  onUnitClick?: (unit: NUnit) => void;
+  onUnitDrop?: (unit: NUnit, destinationUnit: NUnit, target: DropTarget) => void;
+}
+
+export interface MenuItemData<T = string | Function> {
+  label: string;
+  action: T;
+  disabled?: boolean;
+  active?: boolean;
+}
+
+export interface MenuItemSeparator {
+  separator: true;
+}
+
+export type DropdownMenuItemType = MenuItemData<SideAction> | MenuItemSeparator;
+
+export interface BreadcrumbItem {
+  name: string;
+  static?: boolean;
+}
+
+export interface TabsState {
+  selectedIndex: number;
+  count: number;
+  tabClass?: string;
+}
+
+// NOTE: In React, we don't use InjectionKey. 
+// Instead, you export a Context object created via React.createContext<TabsState>(...)
+// This line is removed as it depends on 'vue'.
+
+export type TabItem = string | { label: string; title?: string };
+export type MyTabItem = string | { label: string; value: string; disabled?: boolean };

@@ -1,173 +1,162 @@
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
+import { useState, useRef, useCallback, useEffect } from "react";
+import OLMap from "ol/Map";
+import { unByKey } from "ol/Observable";
+import { MapBrowserEvent } from "ol";
+import { toLonLat } from "ol/proj";
+import type { EventsKey } from "ol/events";
 import type { Position } from "geojson";
-import { useUIStore } from "@/stores/uiStore";
 
-/**
- * Options
- */
+// Giả định bạn đã convert store này sang Zustand
+import { useMapSelectStore } from "@/stores/mapSelectStore";
+
 export interface UseGetMapLocationOptions {
   cancelOnClickOutside?: boolean;
   stopPropagationOnClickOutside?: boolean;
-  changeCursor?: boolean;
-}
-
-/**
- * Return type
- */
-export interface UseGetMapLocationReturn {
-  isActive: boolean;
-  start: () => void;
-  cancel: () => void;
-  onStart: (cb: () => void) => () => void;
-  onGetLocation: (cb: (pos: Position) => void) => () => void;
-  onCancel: (cb: () => void) => () => void;
+  // React-way: Truyền callback vào options thay vì return event hook
+  onGetLocation?: (location: Position) => void;
+  onCancel?: () => void;
+  onStart?: () => void;
 }
 
 export function useGetMapLocation(
-  map: MapLibreMap,
-  options: UseGetMapLocationOptions = {},
-): UseGetMapLocationReturn {
-  const {
-    cancelOnClickOutside = true,
+  olMap: OLMap | null, 
+  options: UseGetMapLocationOptions = {}
+) {
+  const { 
+    cancelOnClickOutside = true, 
     stopPropagationOnClickOutside = true,
-    changeCursor = true,
+    onGetLocation,
+    onCancel,
+    onStart
   } = options;
 
   const [isActive, setIsActive] = useState(false);
-  const uiStore = useUIStore();
+  const mapSelectStore = useMapSelectStore();
+  
+  // Refs để lưu trữ trạng thái cleanup và giá trị cũ mà không gây re-render
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const prevCursorRef = useRef<string>("");
+  const prevHoverValueRef = useRef<boolean>(true);
 
-  const prevCursorRef = useRef<string>(
-    map.getCanvas().style.cursor || "",
-  );
+  // Lưu options vào ref để tránh stale closure trong event listener
+  const callbacksRef = useRef({ onGetLocation, onCancel, onStart });
+  useEffect(() => {
+    callbacksRef.current = { onGetLocation, onCancel, onStart };
+  }, [onGetLocation, onCancel, onStart]);
 
-  const clickListenerRef = useRef<((e: MapMouseEvent) => void) | null>(null);
-  const escListenerRef = useRef<((e: KeyboardEvent) => void) | null>(null);
-  const clickOutsideListenerRef = useRef<((e: MouseEvent) => void) | null>(null);
-
-  /** --------------------
-   * Simple event hooks
-   * -------------------*/
-  const onStartCbs = useRef(new Set<() => void>());
-  const onCancelCbs = useRef(new Set<() => void>());
-  const onGetLocationCbs = useRef(new Set<(pos: Position) => void>());
-
-  const triggerStart = () => onStartCbs.current.forEach((cb) => cb());
-  const triggerCancel = () => onCancelCbs.current.forEach((cb) => cb());
-  const triggerGetLocation = (pos: Position) =>
-    onGetLocationCbs.current.forEach((cb) => cb(pos));
-
-  /** --------------------
-   * Cleanup
-   * -------------------*/
   const cleanUp = useCallback(() => {
-    const canvas = map.getCanvas();
-
-    if (changeCursor) {
-      uiStore.hoverEnabled = true;
-      canvas.style.cursor = prevCursorRef.current;
+    if (!olMap) return;
+    
+    // 1. Khôi phục cursor
+    const el = olMap.getTargetElement();
+    if (el) {
+      el.style.cursor = prevCursorRef.current;
     }
 
+    // 2. Reset state
     setIsActive(false);
 
-    if (clickListenerRef.current) {
-      map.off("click", clickListenerRef.current);
-      clickListenerRef.current = null;
-    }
+    // 3. Khôi phục store
+    // Lưu ý: Cần đảm bảo store có action setHoverEnabled hoặc gán trực tiếp nếu dùng Immer/Zustand
+    // mapSelectStore.hoverEnabled = prevHoverValueRef.current; 
+    // Nếu Zustand: 
+    useMapSelectStore.setState({ hoverEnabled: prevHoverValueRef.current });
 
-    if (escListenerRef.current) {
-      document.removeEventListener("keydown", escListenerRef.current);
-      escListenerRef.current = null;
+    // 4. Chạy hàm cleanup listeners (nếu có)
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
     }
+  }, [olMap]);
 
-    if (clickOutsideListenerRef.current) {
-      document.removeEventListener("mousedown", clickOutsideListenerRef.current);
-      clickOutsideListenerRef.current = null;
-    }
-  }, [map, changeCursor, uiStore]);
-
-  /** --------------------
-   * Cancel
-   * -------------------*/
   const cancel = useCallback(() => {
+    if (!isActive) return; // Chỉ cancel khi đang active
     cleanUp();
-    triggerCancel();
-  }, [cleanUp]);
+    callbacksRef.current.onCancel?.();
+  }, [isActive, cleanUp]);
 
-  /** --------------------
-   * Start
-   * -------------------*/
   const start = useCallback(() => {
+    if (!olMap) return;
+
+    // Trigger start callback
+    callbacksRef.current.onStart?.();
     setIsActive(true);
-    triggerStart();
 
-    const canvas = map.getCanvas();
+    // Lưu trạng thái cũ
+    const el = olMap.getTargetElement();
+    prevCursorRef.current = el.style.cursor;
+    prevHoverValueRef.current = mapSelectStore.hoverEnabled;
 
-    if (changeCursor) {
-      uiStore.hoverEnabled = false;
-      prevCursorRef.current = canvas.style.cursor;
-      canvas.style.cursor = "crosshair";
-    }
+    // Tắt hover & đổi cursor
+    useMapSelectStore.setState({ hoverEnabled: false });
+    el.style.cursor = "crosshair";
 
+    // --- SETUP LISTENERS ---
+
+    // 1. Map Click Handler
+    const handleMapClickEvent = (event: MapBrowserEvent<PointerEvent>) => {
+      event.stopPropagation();
+      // Lấy tọa độ trước khi cleanup
+      const coords = toLonLat(event.coordinate, olMap.getView().getProjection());
+      
+      cleanUp(); // Cleanup trước
+      
+      callbacksRef.current.onGetLocation?.(coords);
+    };
+
+    // @ts-ignore: OpenLayers types đôi khi conflict với DOM event types
+    const clickEventKey: EventsKey = olMap.once("click", handleMapClickEvent);
+
+    // 2. Escape Key Handler
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cancel();
+    };
+    window.addEventListener("keydown", handleEsc);
+
+    // 3. Click Outside Handler
+    let removeClickOutside: (() => void) | undefined;
     if (cancelOnClickOutside) {
-      clickOutsideListenerRef.current = (e: MouseEvent) => {
-        if (!map.getContainer().contains(e.target as Node)) {
-          if (stopPropagationOnClickOutside) e.stopPropagation();
+      const handleClickOutside = (e: Event) => {
+        const target = e.target as Node;
+        // Nếu click không nằm trong map element
+        if (el && !el.contains(target)) {
+          if (stopPropagationOnClickOutside) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
           cancel();
         }
       };
-      document.addEventListener("mousedown", clickOutsideListenerRef.current);
+      
+      // Dùng pointerdown hoặc mousedown để bắt sự kiện sớm hơn click
+      document.addEventListener("pointerdown", handleClickOutside, { capture: true });
+      
+      removeClickOutside = () => {
+        document.removeEventListener("pointerdown", handleClickOutside, { capture: true });
+      };
     }
 
-    escListenerRef.current = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cancel();
-    };
-    document.addEventListener("keydown", escListenerRef.current);
-
-    clickListenerRef.current = (event: MapMouseEvent) => {
-      event.originalEvent.stopPropagation();
-      cleanUp();
-      triggerGetLocation([event.lngLat.lng, event.lngLat.lat]);
+    // --- REGISTER CLEANUP ---
+    cleanupRef.current = () => {
+      unByKey(clickEventKey);
+      window.removeEventListener("keydown", handleEsc);
+      if (removeClickOutside) removeClickOutside();
     };
 
-    map.once("click", clickListenerRef.current);
-  }, [
-    map,
-    cancel,
-    cleanUp,
-    changeCursor,
-    cancelOnClickOutside,
-    stopPropagationOnClickOutside,
-    uiStore,
-  ]);
+  }, [olMap, mapSelectStore.hoverEnabled, cancelOnClickOutside, stopPropagationOnClickOutside, cancel, cleanUp]);
 
-  /** --------------------
-   * Unmount
-   * -------------------*/
+  // Cleanup on unmount
   useEffect(() => {
-    return () => cleanUp();
+    return () => {
+      if (cleanupRef.current) {
+        cleanUp();
+      }
+    };
   }, [cleanUp]);
 
-  /** --------------------
-   * Public API
-   * -------------------*/
   return {
     isActive,
     start,
     cancel,
-    onStart: (cb) => {
-      onStartCbs.current.add(cb);
-      return () => onStartCbs.current.delete(cb);
-    },
-    onGetLocation: (cb) => {
-      onGetLocationCbs.current.add(cb);
-      return () => onGetLocationCbs.current.delete(cb);
-    },
-    onCancel: (cb) => {
-      onCancelCbs.current.add(cb);
-      return () => onCancelCbs.current.delete(cb);
-    },
   };
 }
