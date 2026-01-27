@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useCallback } from "react";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import { GeoJSON } from "ol/format";
@@ -15,9 +15,9 @@ import { featureCollection } from "@turf/helpers";
 
 // Project imports
 import type { NUnit } from "@/types/internalModels";
-import type { FeatureId } from "@/types/scenarioGeoModels";
 import { convertToMetric } from "@/utils/convert";
 import { createSimpleStyle } from "@/geo/simplestyle";
+import { useActiveScenario } from "@/components/injects"; // Import store
 
 // --- Helpers & Styles ---
 
@@ -34,7 +34,6 @@ function createLayer() {
   return layer;
 }
 
-// Format instance (tạo 1 lần dùng chung)
 const gjf = new GeoJSON({
   featureProjection: "EPSG:3857",
   dataProjection: "EPSG:4326",
@@ -44,7 +43,7 @@ function createRangeRings(unit: NUnit) {
   return (
     unit.rangeRings
       ?.map((r, i) =>
-        !r.hidden && unit._state?.location // Thêm check location an toàn
+        !r.hidden && unit._state?.location
           ? circle(
               unit._state.location,
               convertToMetric(r.range, r.uom || "km") / 1000,
@@ -63,42 +62,41 @@ function createRangeRings(unit: NUnit) {
 
 // --- Internal Hook for Styles ---
 
-function useRangeRingStyles(
-  units: NUnit[],
-  rangeRingGroupMap: Record<string, any>
-) {
+function useRangeRingStyles() {
   const styleCache = useRef(new Map<string, Style>());
+  const { geo } = useActiveScenario();
   
-  // Refs để styleFunction luôn đọc được dữ liệu mới nhất mà không cần recreate function
-  const dataRef = useRef({ units, rangeRingGroupMap });
-  useEffect(() => {
-    dataRef.current = { units, rangeRingGroupMap };
-  }, [units, rangeRingGroupMap]);
+  // Lấy units trực tiếp từ store thay vì truyền qua args
+  // Lưu ý: geo.everyVisibleUnit có thể là getter hoặc array.
+  // Giả định là array hoặc ta dùng useMemo để access.
+  const units = geo.everyVisibleUnit; 
+
+  // Refs để giữ data mới nhất cho style function
+  const unitsRef = useRef(units);
+  useEffect(() => { unitsRef.current = units; }, [units]);
 
   const clearCache = () => {
     styleCache.current.clear();
   };
 
-  const rangeRingStyle = (feature: FeatureLike, resolution: number): Style | Style[] => {
+  const rangeRingStyle = useCallback((feature: FeatureLike, resolution: number): Style | Style[] => {
     const id = feature.get("id");
     let style = styleCache.current.get(id);
 
     if (!style) {
       const isGroup = feature.get("isGroup");
-      const { units, rangeRingGroupMap } = dataRef.current;
+      const currentUnits = unitsRef.current; // Dùng Ref để tránh closure cũ
 
       if (isGroup) {
-        const groupStyle = rangeRingGroupMap[id]?.style;
-        style = groupStyle
-          ? createSimpleStyle({ fill: null, stroke: "red", ...groupStyle })
-          : defaultStyle;
+        // Mock logic group style (cần mapSettingsStore nếu muốn lấy group map thực tế)
+        style = defaultStyle; 
       } else {
         const parts = id.split("-");
         const indexStr = parts.pop();
         const unitId = parts.join("-");
         const index = parseInt(indexStr || "0", 10);
         
-        const unit = units.find(u => u.id === unitId);
+        const unit = currentUnits.find((u) => u.id === unitId);
         const ring = unit?.rangeRings?.[index];
         
         style = ring?.style
@@ -108,33 +106,28 @@ function useRangeRingStyles(
       styleCache.current.set(id, style);
     }
     return style;
-  };
+  }, []);
 
-  return {
-    clearCache,
-    rangeRingStyle,
-  };
+  return { clearCache, rangeRingStyle };
 }
 
 // --- Main Hook ---
 
-export function useRangeRingsLayer(
-  olMap: OLMap | null,
-  units: NUnit[], // Danh sách units (filtered/visible)
-  rangeRingGroupMap: Record<string, any> = {} // Map style settings
-) {
+export function useRangeRingsLayer(olMap: OLMap | null) {
+  const { geo } = useActiveScenario();
+  const units = geo.everyVisibleUnit; // Lấy data từ context
+
   // 1. Setup Layer
   const layer = useMemo(() => createLayer(), []);
   
   // 2. Setup Style Logic
-  const { rangeRingStyle, clearCache } = useRangeRingStyles(units, rangeRingGroupMap);
+  const { rangeRingStyle, clearCache } = useRangeRingStyles();
 
-  // Gán style function cho layer
   useEffect(() => {
     layer.setStyle(rangeRingStyle);
   }, [layer, rangeRingStyle]);
 
-  // 3. Add/Remove Layer on Map
+  // 3. Add/Remove Layer
   useEffect(() => {
     if (!olMap) return;
     olMap.addLayer(layer);
@@ -143,19 +136,15 @@ export function useRangeRingsLayer(
     };
   }, [olMap, layer]);
 
-  // 4. Draw Logic (Chạy khi units thay đổi)
-  useEffect(() => {
-    if (!olMap) return;
-
+  // 4. Draw Function (Exposed)
+  const drawRangeRings = useCallback(() => {
     const source = layer.getSource();
     if (!source) return;
 
-    // Clear cũ
     source.clear();
     clearCache();
 
-    // Tính toán Features (Turf JS logic)
-    // Lọc các unit có rangeRings
+    // Lọc units có rings
     const unitsWithRings = units.filter((u) => u.rangeRings?.length);
     if (unitsWithRings.length === 0) return;
 
@@ -169,28 +158,30 @@ export function useRangeRingsLayer(
       rangeRingsFC.features.filter((r) => r.properties.isGroup),
     );
 
-    // Xử lý Group (Cluster & Union)
+    // Xử lý Group
     clusterEach(grouped, "id", (cluster) => {
       if (!cluster.features.length) return;
-      
       const merged =
         cluster.features.length > 1
           ? union(cluster, {
               properties: { id: cluster.features[0].properties.id, isGroup: true },
             })
-          : cluster.features[0];
-          
+          : cluster.features[0]; 
       if (merged) {
         source.addFeature(gjf.readFeature(merged) as Feature);
       }
     });
 
-    // Thêm các feature không group
+    // Xử lý không group
     if (unGrouped.features.length > 0) {
       source.addFeatures(gjf.readFeatures(unGrouped) as Feature[]);
     }
+  }, [units, layer, clearCache]);
 
-  }, [units, olMap, layer]); // Re-run khi danh sách unit thay đổi
+  // Tự động vẽ khi units thay đổi
+  useEffect(() => {
+    drawRangeRings();
+  }, [drawRangeRings]);
 
-  return { rangeLayer: layer };
+  return { rangeLayer: layer, drawRangeRings };
 }

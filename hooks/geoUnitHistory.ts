@@ -435,5 +435,8 @@ export function useUnitHistory(
   return {
     historyLayer,
     drawHistory,
+    historyModify,
+    waypointSelect,
+    ctrlClickInteraction,
   };
 }

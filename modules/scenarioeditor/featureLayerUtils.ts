@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import OLMap from "ol/Map";
 import VectorLayer from "ol/layer/Vector";
 import LayerGroup from "ol/layer/Group";
@@ -159,7 +159,7 @@ export function createScenarioLayerFeatures(
  * Hook to handle feature selection interactions on the map.
  */
 export function useScenarioFeatureSelect(
-  olMap: OLMap | null, // olMap might be null initially in React
+  olMap: OLMap | null,
   options: Partial<{
     enable: boolean;
   }> = {},
@@ -167,74 +167,17 @@ export function useScenarioFeatureSelect(
   const { scenarioFeatureStyle } = useFeatureStyles();
   const { selectedUnitIds, selectedFeatureIds, selectFeature, deselectFeature, clear: clearSelection } = useSelectedItems();
   
-  // Ref to track internal updates (prevent loop between map select <-> store select)
   const isInternal = useRef(false);
   const enable = options.enable ?? true;
 
-  // Setup Interaction
-  useEffect(() => {
-    if (!olMap || !enable) return;
+  // Ref để giữ style function mới nhất mà không cần recreate interaction
+  const styleRef = useRef(scenarioFeatureStyle);
+  useEffect(() => { styleRef.current = scenarioFeatureStyle; }, [scenarioFeatureStyle]);
 
-    const scenarioLayersGroup = getOrCreateLayerGroup(olMap);
-    const scenarioLayersOl = scenarioLayersGroup.getLayers() as Collection<VectorLayer<any>>;
+  // 1. Tạo Interaction bằng useMemo (thay vì trong useEffect)
+  const selectInteraction = useMemo(() => {
+    if (!olMap) return null;
 
-    const selectInteraction = new Select({
-      condition: clickCondition,
-      hitTolerance: 20,
-      layers: scenarioLayersOl.getArray(),
-      style: (feature: FeatureLike, res: number): Style | Style[] => {
-        const s = scenarioFeatureStyle(feature, res, true)!;
-        let activeSelectStyle: Style;
-        if (feature.getGeometry()?.getType() === "Point") {
-          activeSelectStyle = selectMarkerStyle;
-        } else {
-          selectStyle.getStroke()?.setWidth((s.getStroke()?.getWidth() || 0) + 8);
-          activeSelectStyle = selectStyle;
-        }
-        return [activeSelectStyle, s];
-      },
-    });
-
-    olMap.addInteraction(selectInteraction);
-
-    const key = selectInteraction.on("select", (event: SelectEvent) => {
-      isInternal.current = true;
-      event.selected.forEach((f) => selectFeature(f.getId() as string));
-      event.deselected.forEach((f) => deselectFeature(f.getId() as string));
-      // Reset internal flag after a short delay or next tick if needed, 
-      // but usually the store update effect will run next.
-    });
-
-    // Store Update Listener (Sync Store -> Map)
-    // We do this logic inside a separate effect or here if we access the interaction instance.
-    // To keep it clean, we'll attach the interaction to the map object or a ref if needed,
-    // but here we can define the sync logic in a parallel effect dependent on the interaction.
-
-    return () => {
-      unByKey(key);
-      olMap.removeInteraction(selectInteraction);
-    };
-  }, [olMap, enable, scenarioFeatureStyle, selectFeature, deselectFeature]);
-
-  // Sync Store Changes to Map Selection
-  useEffect(() => {
-    if (!olMap || !enable) return;
-
-    // We need to access the active interaction. 
-    // Since we create it inside the effect above, strictly speaking, we should store it in a ref
-    // to access it here, or merge the effects.
-    // For simplicity/correctness in React, let's assume we can find it or we restructure.
-    // Better approach: Create interaction in a ref.
-    
-    // ... (See Refactoring below for cleaner React pattern)
-  }, [selectedFeatureIds, olMap, enable]);
-
-  // REFACTORED PATTERN FOR REACT:
-  
-  const selectInteractionRef = useRef<Select | null>(null);
-
-  useEffect(() => {
-    if (!olMap) return;
     const scenarioLayersGroup = getOrCreateLayerGroup(olMap);
     const scenarioLayersOl = scenarioLayersGroup.getLayers() as Collection<VectorLayer<any>>;
 
@@ -243,7 +186,8 @@ export function useScenarioFeatureSelect(
       hitTolerance: 20,
       layers: scenarioLayersOl.getArray(),
       style: (feature: FeatureLike, res: number): Style | Style[] => {
-        const s = scenarioFeatureStyle(feature, res, true)!;
+        // Dùng ref để gọi style function mới nhất
+        const s = styleRef.current(feature, res, true)!;
         let activeSelectStyle: Style;
         if (feature.getGeometry()?.getType() === "Point") {
           activeSelectStyle = selectMarkerStyle;
@@ -254,14 +198,20 @@ export function useScenarioFeatureSelect(
         return [activeSelectStyle, s];
       },
     });
+    return interaction;
+  }, [olMap]); // Chỉ tạo lại khi olMap thay đổi
 
-    interaction.setActive(enable);
-    olMap.addInteraction(interaction);
-    selectInteractionRef.current = interaction;
+  // 2. Quản lý Events và Add/Remove Interaction
+  useEffect(() => {
+    if (!olMap || !selectInteraction) return;
 
-    const key = interaction.on("select", (event: SelectEvent) => {
+    // Add to map
+    olMap.addInteraction(selectInteraction);
+    selectInteraction.setActive(enable);
+
+    // Event Listener
+    const key = selectInteraction.on("select", (event: SelectEvent) => {
       isInternal.current = true;
-      // Assume store actions handle Sets
       event.selected.forEach((f) => selectFeature(f.getId() as string));
       event.deselected.forEach((f) => deselectFeature(f.getId() as string));
       isInternal.current = false;
@@ -269,35 +219,25 @@ export function useScenarioFeatureSelect(
 
     return () => {
       unByKey(key);
-      olMap.removeInteraction(interaction);
-      selectInteractionRef.current = null;
+      olMap.removeInteraction(selectInteraction);
     };
-  }, [olMap, scenarioFeatureStyle]); // Re-create if style logic changes or map changes
+  }, [olMap, selectInteraction, enable, selectFeature, deselectFeature]);
 
-  // Update active state
+  // 3. Sync Store Changes -> Map Selection (External Update)
   useEffect(() => {
-    if (selectInteractionRef.current) {
-      selectInteractionRef.current.setActive(enable);
-      if (!enable) {
-        selectInteractionRef.current.getFeatures().clear();
-      }
-    }
-  }, [enable]);
-
-  // Sync Store -> Map
-  useEffect(() => {
-    if (!olMap || !selectInteractionRef.current) return;
+    if (!olMap || !selectInteraction) return;
+    // Nếu đang trigger từ interaction thì bỏ qua để tránh loop
     if (isInternal.current) return;
 
-    const selectedFeatures = selectInteractionRef.current.getFeatures();
+    const selectedFeatures = selectInteraction.getFeatures();
     const scenarioLayersGroup = getOrCreateLayerGroup(olMap);
     const scenarioLayersOl = scenarioLayersGroup.getLayers() as Collection<VectorLayer<any>>;
 
     selectedFeatures.clear();
     
-    // If unit selection is active, clear feature selection (mutually exclusive behavior from original code)
+    // Ưu tiên Unit Selection (nếu có unit chọn thì clear feature)
     if (selectedUnitIds.size > 0) {
-      clearSelection(); // This might trigger a re-render/loop if not careful, original code cleared `selectedIds` ref
+      if (selectedFeatureIds.size > 0) clearSelection();
       return;
     }
 
@@ -305,9 +245,12 @@ export function useScenarioFeatureSelect(
       const { feature } = getFeatureAndLayerById(fid, scenarioLayersOl) || {};
       if (feature) selectedFeatures.push(feature);
     });
-  }, [selectedFeatureIds, selectedUnitIds, olMap, clearSelection]);
+  }, [selectedFeatureIds, selectedUnitIds, olMap, selectInteraction, clearSelection]);
 
-  return { selectedIds: selectedFeatureIds };
+  return { 
+    selectInteraction, 
+    selectedIds: selectedFeatureIds 
+  };
 }
 
 export function useFeatureLayerUtils(
