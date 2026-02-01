@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { isClient } from "@/utils"; // Giả định import này đã tồn tại
 
 interface DragHandleProps {
-  parentRef?: HTMLElement | SVGElement | null;
+  parentRef?: React.RefObject<HTMLElement | SVGElement | null>;
   horizontal?: boolean;
   left?: boolean;
   
@@ -64,8 +64,8 @@ export default function DragHandle({
     dragging.current = true;
 
     // Logic gốc của Vue: Emit width hiện tại của parent trước khi drag
-    if (parentRef) {
-      const width = parentRef.getBoundingClientRect().width;
+    if (parentRef && parentRef.current) {
+      const width = parentRef.current.getBoundingClientRect().width;
       onResizeStart?.(width);
     }
 

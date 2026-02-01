@@ -84,6 +84,36 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
   const { rangeLayer, drawRangeRings } = useRangeRingsLayer(olMap);
   const dayNightLayer = useDayNightLayer();
 
+  // Map layers and feature layers hooks
+  const { initializeFromStore: loadMapLayers } = useScenarioMapLayers(olMap);
+  const { initializeFeatureLayersFromStore } = useScenarioFeatureLayers(olMap);
+  
+  // History & Interactions
+  const { 
+    historyLayer, drawHistory, historyModify, waypointSelect, ctrlClickInteraction 
+  } = useUnitHistory(olMap, {
+    showHistory: unitSettingsStore.showHistory,
+    editHistory: unitSettingsStore.editHistory,
+    showWaypointTimestamps: unitSettingsStore.showWaypointTimestamps,
+  });
+
+  // Hover, select, and other interactions
+  const { redraw: redrawSelectedUnits, unitSelectInteraction, boxSelectInteraction } = useUnitSelectInteraction([unitLayer], olMap, {
+    enable: unitSelectEnabled,
+  });
+  
+  const { selectInteraction: featureSelectInteractionHook } = useScenarioFeatureSelect(olMap, {
+    enable: featureSelectEnabled,
+  });
+
+  const { moveInteraction: moveUnitInteraction } = useMoveInteraction(
+    olMap,
+    unitLayer,
+    unitSettingsStore.moveUnitEnabled,
+  );
+
+  useMapHover(olMap, { enable: hoverEnabled });
+
   // --- Main Initialization Effect ---
   useEffect(() => {
     if (!olMap) return;
@@ -101,58 +131,37 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
     unitLayerGroup.set("title", "Units");
 
     // 4. Add Layers
-    olMap.addLayer(dayNightLayer);
-    olMap.addLayer(rangeLayer);
-    olMap.addLayer(unitLayerGroup); // Sẽ add historyLayer sau thông qua hook useUnitHistory
+    // Check if layers already exist to prevent duplicates (React Strict Mode issue)
+    const existingLayers = olMap.getLayers().getArray();
+    if (!existingLayers.includes(dayNightLayer)) {
+      olMap.addLayer(dayNightLayer);
+    }
+    if (!existingLayers.includes(rangeLayer)) {
+      olMap.addLayer(rangeLayer);
+    }
+    if (!existingLayers.includes(unitLayerGroup)) {
+      olMap.addLayer(unitLayerGroup); // Sẽ add historyLayer sau thông qua hook useUnitHistory
+    }
     
     // Track layers for cleanup
     layersRef.current.push(dayNightLayer, rangeLayer, unitLayerGroup);
 
-    // 5. Initialize Managers
-    const { initializeFromStore: loadMapLayers } = useScenarioMapLayers(olMap);
-    const { initializeFeatureLayersFromStore } = useScenarioFeatureLayers(olMap);
-    
-    // 6. History & Interactions
-    const { 
-        historyLayer, drawHistory, historyModify, waypointSelect, ctrlClickInteraction 
-    } = useUnitHistory(olMap, {
-        showHistory: unitSettingsStore.showHistory,
-        editHistory: unitSettingsStore.editHistory,
-        showWaypointTimestamps: unitSettingsStore.showWaypointTimestamps,
-    });
-    olMap.addLayer(historyLayer);
+    // 5. Add history layer
+    if (!existingLayers.includes(historyLayer)) {
+      olMap.addLayer(historyLayer);
+    }
     layersRef.current.push(historyLayer);
 
-    // 7. Hover Logic
-    // Lưu ý: useMapHover thường attach event listener, cần đảm bảo nó có cơ chế cleanup
-    useMapHover(olMap, { enable: hoverEnabled });
+    // 6. Initialize Managers (call the initialize functions from hooks)
+    loadMapLayers();
+    initializeFeatureLayersFromStore();
 
-    // 8. Select Interactions
-    const {
-      unitSelectInteraction,
-      boxSelectInteraction,
-      redraw: redrawSelectedUnits,
-    } = useUnitSelectInteraction([unitLayer], olMap, {
-      enable: unitSelectEnabled,
-    });
-
-    const { selectInteraction: featureSelectInteraction } = useScenarioFeatureSelect(olMap, {
-      enable: featureSelectEnabled,
-    });
-
-    // Add interactions (Order matters!)
+    // 7. Add interactions (Order matters!)
     olMap.addInteraction(unitSelectInteraction);
     olMap.addInteraction(boxSelectInteraction);
     olMap.addInteraction(waypointSelect);
     olMap.addInteraction(historyModify);
     olMap.addInteraction(ctrlClickInteraction);
-    
-    // 9. Move Interaction
-    const { moveInteraction: moveUnitInteraction } = useMoveInteraction(
-      olMap,
-      unitLayer,
-      unitSettingsStore.moveUnitEnabled,
-    );
     olMap.addInteraction(moveUnitInteraction);
 
     // Logic toggle move interaction khi visibility thay đổi
@@ -162,24 +171,22 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
     };
     unitLayerGroup.on("change:visible", toggleMoveUnitInteraction);
 
-    // 10. Initial Draws & Loads
+    // 8. Initial Draws
     drawRangeRings();
     drawUnits();
     drawHistory();
-    loadMapLayers();
-    initializeFeatureLayersFromStore();
 
-    // 11. Fit View
+    // 9. Fit View
     const extent = unitLayer.getSource()?.getExtent();
     if (extent && !unitLayer.getSource()?.isEmpty()) {
       olMap.getView().fit(extent, { padding: [100, 100, 150, 100], maxZoom: 16 });
     }
 
-    // 12. Emit Ready
-    if (featureSelectInteraction) {
+    // 10. Emit Ready
+    if (featureSelectInteractionHook) {
       onMapReady?.({ 
         olMap, 
-        featureSelectInteraction, 
+        featureSelectInteraction: featureSelectInteractionHook, 
         unitSelectInteraction 
       });
     }
@@ -222,25 +229,12 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
 
   // Watch: Redraw Units (geo.everyVisibleUnit)
   useEffect(() => {
-    // Hàm redraw tổng hợp
-    const redrawUnits = () => {
-        drawUnits();
-        // Cần truy cập lại các hàm draw/redraw từ scope initialization
-        // Cách tốt nhất là move các hàm draw ra ngoài hoặc dùng ref để lưu,
-        // hoặc gọi lại hook nếu hook đó stateless.
-        // Giả định drawHistory và drawRangeRings có thể import/gọi lại được.
-        // Ở đây tôi gọi lại từ kết quả hook ở trên:
-        const { drawHistory } = useUnitHistory(olMap, { /* params */ }); 
-        const { redraw: redrawSelected } = useUnitSelectInteraction([unitLayer], olMap, { /* params */ });
-        const { drawRangeRings } = useRangeRingsLayer(olMap);
-
-        drawHistory();
-        redrawSelected();
-        drawRangeRings();
-    };
-
-    redrawUnits();
-  }, [geo.everyVisibleUnit]); // Deep dependency check phụ thuộc vào implementation của Context
+    // Use the functions already returned from hooks at top level
+    drawUnits();
+    drawHistory();
+    redrawSelectedUnits();
+    drawRangeRings();
+  }, [geo.everyVisibleUnit, drawUnits, drawHistory, redrawSelectedUnits, drawRangeRings]);
 
   // Watch: Settings Change -> Clear Cache & Redraw
   useEffect(() => {
@@ -251,7 +245,6 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
   // Watch: Time / Filter -> Reload Features
   useEffect(() => {
     const doNotFilterLayers = uiStore.layersPanelActive;
-    const { initializeFeatureLayersFromStore } = useScenarioFeatureLayers(olMap);
 
     initializeFeatureLayersFromStore({
       doClearCache: false,
@@ -265,7 +258,7 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
       selectedFeatureIds.clear();
       ids.forEach(id => selectedFeatureIds.add(id));
     }
-  }, [store.state.currentTime, uiStore.layersPanelActive, store.state.featureStateCounter]);
+  }, [store.state.currentTime, uiStore.layersPanelActive, store.state.featureStateCounter, initializeFeatureLayersFromStore, selectedFeatureIds]);
 
   // Handle Export Action
   useEffect(() => {

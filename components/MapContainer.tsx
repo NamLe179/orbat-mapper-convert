@@ -75,11 +75,13 @@ export default function MapContainer({
     const initMapLayers = async () => {
       // Gọi action initialize từ store
       await initializeStore();
+      console.log("[MapContainer] Base layers store initialized");
 
       // Mẹo quan trọng:
       // Tại thời điểm này, biến `storedLayers` (từ hook) chưa kịp cập nhật do React render cycle.
       // Ta dùng `useBaseLayersStore.getState()` để lấy dữ liệu mới nhất ngay lập tức.
       const freshState = useBaseLayersStore.getState();
+      console.log("[MapContainer] Fresh state layers:", freshState.layers.length, "activeLayerName:", freshState.activeLayerName);
       
       // Xử lý override active layer nếu props truyền vào có
       if (
@@ -97,6 +99,7 @@ export default function MapContainer({
       );
       
       layerInstances.current = createdLayers;
+      console.log("[MapContainer] Created", createdLayers.length, "base layer instances");
 
       // Add layers vào Map
       createdLayers.forEach((layer) => {
@@ -111,8 +114,16 @@ export default function MapContainer({
         // Sync Visibility ban đầu (dựa trên active name mới nhất)
         // Lưu ý: dùng getState() để lấy activeName chính xác nhất lúc này
         const currentActiveName = useBaseLayersStore.getState().activeLayerName;
-        layer.setVisible(layer.get("name") === currentActiveName);
+        const isVisible = layer.get("name") === currentActiveName;
+        layer.setVisible(isVisible);
+        console.log("[MapContainer] Layer", layer.get("name"), "visible:", isVisible);
       });
+
+      // Force map to update size after container is fully rendered
+      setTimeout(() => {
+        olMap.updateSize();
+        console.log("[MapContainer] Map size updated");
+      }, 100);
 
       // Báo ra ngoài là Map đã sẵn sàng
       onReady?.(olMap);
@@ -164,5 +175,30 @@ export default function MapContainer({
     });
   }, [storedLayers]);
 
-  return <div ref={mapRoot} className="h-full w-full map-container-custom" />;
+  // Debug: Log actual dimensions
+  useEffect(() => {
+    if (mapRoot.current) {
+      const rect = mapRoot.current.getBoundingClientRect();
+      console.log("[MapContainer] Container dimensions:", rect.width, "x", rect.height);
+      
+      // Log parent chain dimensions
+      let parent = mapRoot.current.parentElement;
+      let level = 1;
+      while (parent && level <= 7) {
+        const parentRect = parent.getBoundingClientRect();
+        const classes = parent.className || 'no-class';
+        const dataAttr = parent.getAttribute('data-component') || 'no-data';
+        console.log(`[MapContainer] Parent level ${level} (${dataAttr}):`, parentRect.width, "x", parentRect.height, `- ${classes.substring(0, 50)}`);
+        parent = parent.parentElement;
+        level++;
+      }
+    }
+  });
+
+  return (
+    <div 
+      ref={mapRoot} 
+      style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+    />
+  );
 }

@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { type CoordinateFormatType } from "@/hooks/geoShowLocation";
 import { DEFAULT_BASEMAP_ID } from "@/config/constants";
 
-interface MapSettingsState {
+export interface MapSettingsState {
   // Persisted State
   showLocation: boolean;
   coordinateFormat: CoordinateFormatType;

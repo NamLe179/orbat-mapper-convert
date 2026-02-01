@@ -38,7 +38,7 @@ export const useSettingsStore = create<SettingsState>()(
 // 2. Symbol Settings Store
 // -----------------------------------------------------------------------------
 
-interface SymbolSettingsState {
+export interface SymbolSettingsState {
   // State
   symbologyStandard: SymbologyStandard;
   simpleStatusModifier: boolean;

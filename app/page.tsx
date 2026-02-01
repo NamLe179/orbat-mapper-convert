@@ -1,48 +1,128 @@
-import AcmeLogo from "@/app/ui/acme-logo";
-import { ArrowRightIcon } from "@heroicons/react/24/outline";
-import Link from "next/link";
-import Image from "next/image";
+"use client";
 
-export default function Page() {
+import { ExternalLink, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { GithubIcon } from "@/components/GithubIcon";
+import { CheckIcon } from "@heroicons/react/24/outline";
+import ProseSection from "@/components/ProseSection";
+import LandingPageScenarios from "./_components/LandingPageScenarios";
+
+const features = [
+  {
+    name: "Create ORBATs",
+    description: "Quickly build ORBATs.",
+  },
+  {
+    name: "Draw features",
+    description: "",
+  },
+  {
+    name: "Client side only",
+    description: "Everything is stored on your computer.",
+  },
+  {
+    name: "Grid edit mode",
+    description: "Efficient editing.",
+  },
+  {
+    name: "Export to KML/KMZ",
+    description: "View your scenario in 3D with Google Earth.",
+  },
+  {
+    name: "Export as GeoJSON",
+    description: "",
+  },
+  {
+    name: "Import MilX",
+    description: "Import military map overlays from map.army.",
+  },
+  {
+    name: "Import GeoJSON",
+    description: "",
+  },
+];
+
+export default function LandingPage() {
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === "dark";
+
+  const toggleDark = () => {
+    setTheme(isDark ? "light" : "dark");
+  };
+
   return (
-    <main className="flex min-h-screen flex-col p-6">
-      <div className="flex h-20 shrink-0 items-end rounded-lg bg-blue-500 p-4 md:h-52">
-        {/* <AcmeLogo /> */}
-      </div>
-      <div className="mt-4 flex grow flex-col gap-4 md:flex-row">
-        <div className="flex flex-col justify-center gap-6 rounded-lg bg-gray-50 px-6 py-10 md:w-2/5 md:px-20">
-          <p className={`text-xl text-gray-800 md:text-3xl md:leading-normal`}>
-            <strong>Welcome to Acme.</strong> This is the example for the{" "}
-            <a href="https://nextjs.org/learn/" className="text-blue-500">
-              Next.js Learn Course
-            </a>
-            , brought to you by Vercel.
-          </p>
-          <div></div>
-          <Link
-            href="/login"
-            className="flex items-center gap-5 self-start rounded-lg bg-blue-500 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-400 md:text-base"
-          >
-            <span>Log in</span> <ArrowRightIcon className="w-5 md:w-6" />
-          </Link>
-        </div>
-        <div className="flex items-center justify-center p-6 md:w-3/5 md:px-28 md:py-12">
-          <Image
-            src="/hero-desktop.png"
-            width={1000}
-            height={760}
-            className="hidden md:block"
-            alt="Screenshots of the dashboard project showing desktop version"
-          />
-          <Image
-            src="/hero-mobile.png"
-            width={560}
-            height={620}
-            className="block md:hidden"
-            alt="Screenshots of the dashboard project showing mobile version"
-          />
-        </div>
-      </div>
-    </main>
+    <div className="flex h-full flex-col bg-background">
+      <header className="relative top-0 right-0 left-0 flex items-center justify-center gap-8 bg-muted p-1 text-center">
+        <p>
+          This is a work in progress prototype. Follow the{" "}
+          <a href="https://github.com/orbat-mapper/orbat-mapper" className="underline">
+            development on GitHub <GithubIcon className="inline size-6 sm:size-10" />
+          </a>
+        </p>
+        <Button variant="ghost" size="icon" onClick={toggleDark} title="Toggle dark mode">
+          {isDark ? <Sun /> : <Moon />}
+        </Button>
+      </header>
+
+      <main>
+        <section className="mt-16 sm:mt-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold tracking-tight text-heading sm:text-5xl md:text-6xl">
+                <span className="text-red-900 dark:text-red-900/90">ORBAT</span>
+                Mapper
+                <span className="absolute text-sm uppercase tracking-normal text-muted-foreground">
+                  beta
+                </span>
+              </h1>
+              <p className="mx-auto mt-3 max-w-md text-base text-muted-foreground sm:text-lg md:mt-5 md:max-w-3xl md:text-xl">
+                Recreate historic battles and military scenarios in your browser
+              </p>
+              <p className="mt-4">
+                <Button asChild variant="link">
+                  <a
+                    href="https://docs.orbat-mapper.app/guide/about-orbat-mapper"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View documentation
+                    <ExternalLink className="-ml-1 text-muted-foreground" />
+                  </a>
+                </Button>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto mt-10 max-w-7xl px-4 sm:px-6">
+          <div className="mx-auto max-w-md text-center lg:max-w-xl">
+            <p className="text-lg font-semibold leading-8 tracking-tight text-primary">
+              Features
+            </p>
+          </div>
+          <div className="mx-auto mt-4 max-w-7xl px-4 sm:px-6 lg:px-8">
+            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:max-w-none lg:grid-cols-3 lg:gap-y-4">
+              {features.map((feature) => (
+                <div key={feature.name} className="relative pl-10">
+                  <dt className="font-semibold leading-6 text-heading">
+                    <div className="absolute top-0 left-0 flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                      <CheckIcon className="h-5 w-5 text-white" aria-hidden="true" />
+                    </div>
+                    {feature.name}
+                  </dt>
+                  <dd className="text-sm text-muted-foreground">{feature.description}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <LandingPageScenarios />
+        </section>
+      </main>
+    </div>
   );
 }

@@ -13,30 +13,34 @@ import { type MenuItemData } from "@/components/types";
 
 // Giả định kiểu dữ liệu của MenuItemData nếu chưa có
 // (Action có thể là string ID hoặc một function thực thi trực tiếp)
-interface DotsMenuProps {
-  items: MenuItemData[];
+interface DotsMenuProps<T = string> {
+  items: MenuItemData<T>[];
   sideOffset?: number;
+  portal?: boolean;
+  className?: string;
   // Callback thay thế cho emit('action')
-  onAction?: (action: string) => void;
+  onAction?: (action: T) => void;
 }
 
-export default function DotsMenu({
+export default function DotsMenu<T = string>({
   items,
   sideOffset = 10,
+  portal,
+  className,
   onAction,
-}: DotsMenuProps) {
+}: DotsMenuProps<T>) {
   
-  const handleItemClick = (item: MenuItemData) => {
+  const handleItemClick = (item: MenuItemData<T>) => {
     if (typeof item.action === "function") {
       item.action();
-    } else if (onAction && typeof item.action === "string") {
-      onAction(item.action);
+    } else if (onAction) {
+      onAction(item.action as T);
     }
   };
 
   return (
-    <div>
-      <DropdownMenu>
+    <div className={className}>
+      <DropdownMenu modal={portal}>
         <DropdownMenuTrigger asChild>
           {/* @click.stop trong Vue tương đương e.stopPropagation() */}
           <Button

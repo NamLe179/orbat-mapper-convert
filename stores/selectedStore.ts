@@ -43,6 +43,9 @@ interface SelectedState {
   deleteSelectedUnitId: (id: EntityId) => void;
   clearSelectedUnitIds: () => void;
 
+  setSelectedFeatureIds: (ids: Set<FeatureId>) => void;
+  clearSelectedFeatureIds: () => void;
+
   // General
   clear: () => void;
 }
@@ -90,7 +93,20 @@ export const useSelectedStore = create<SelectedState>((set, get) => ({
     }),
 
   // --- Set Active Actions (Equivalent to computed setters) ---
-  
+  setSelectedFeatureIds: (ids) => {
+    set((state) => ({
+      selectedFeatureIds: ids,
+      activeFeatureId: syncActiveId(ids, state.activeFeatureId)
+    }));
+  },
+
+  clearSelectedFeatureIds: () => {
+    set({
+      selectedFeatureIds: new Set(),
+      activeFeatureId: null
+    });
+  },
+
   setActiveUnitId: (id) => {
     get().clear();
     if (id) {

@@ -18,6 +18,7 @@ interface LoadingState {
   setLoading: (v: boolean) => void;
 }
 
+
 export const useLoadingStore = create<LoadingState>((set) => ({
   isLoading: false,
   setLoading: (isLoading) => set({ isLoading }),
@@ -27,6 +28,12 @@ export const useLoadingStore = create<LoadingState>((set) => ({
 export const useIsLoading = () => useLoadingStore((state) => state.isLoading);
 export const useSetLoading = () => useLoadingStore((state) => state.setLoading);
 
+export interface ScenarioStoreWithHistory extends NewScenarioStore {
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+}
 
 // --- Scenario Context ---
 // Replaces: const globalStoreRef = shallowRef<NewScenarioStore>({} as any);
@@ -66,39 +73,58 @@ export function useScenario() {
   // Note: These hooks must be converted to React Hooks or pure functions in their respective files.
   // Based on previous conversions (e.g. geo.ts), they are React Hooks.
   
-  // We use a safe-guard for the hooks. If store is null, these hooks might need to handle it.
-  // Assuming for this conversion that `store` is valid when accessed, or we pass a placeholder.
-  const safeStore = store || ({} as NewScenarioStore); 
-
-  const unitActions = useUnitManipulations(safeStore);
-  const time = useScenarioTime(safeStore);
+  // Pass store directly (can be null), sub-hooks should handle null gracefully
+  const unitActions = useUnitManipulations(store || ({} as NewScenarioStore));
+  const timeActions = useScenarioTime(store || ({} as NewScenarioStore));
   
   // IO likely needs access to setStore to load a new scenario
   // Passing a ref-like object { value: store } or the setter
   const io = useScenarioIO({ store, setStore }); 
   
-  const geo = useGeo(safeStore);
-  const helpers = useStateHelpers(safeStore);
-  const settings = useScenarioSettings(safeStore);
+  const geo = useGeo(store);
+  const helpers = useStateHelpers(store || ({} as NewScenarioStore));
+  const settings = useScenarioSettings(store || ({} as NewScenarioStore));
 
   const scenario = useMemo(() => {
     if (!store) return null;
+
+    // Don't spread store - it will lose methods and getters
+    // Instead, create a proxy or wrapper that adds undo/redo
+    const storeWithHistory = store as ScenarioStoreWithHistory;
+    // Add undo/redo methods if they don't exist
+    if (!('undo' in storeWithHistory)) {
+      (storeWithHistory as any).undo = () => console.warn("Undo not implemented");
+      (storeWithHistory as any).redo = () => console.warn("Redo not implemented");
+      (storeWithHistory as any).canUndo = false;
+      (storeWithHistory as any).canRedo = false;
+    }
+    
+    const timeWithState = {
+      ...timeActions,
+      timeZone: store.state?.info?.timeZone || "UTC", // Lấy từ store state gốc
+    };
     return {
-      store,
+      store: storeWithHistory,
       unitActions,
-      time,
+      time: timeWithState,
       io,
       geo,
       helpers,
       settings,
     };
-  }, [store, unitActions, time, io, geo, helpers, settings]);
+  }, [store, unitActions, timeActions, io, geo, helpers, settings]);
 
   return {
     scenario, // Can be null if not initialized
     isLoading,
     isReady: !!store && !!store.state,
     setStore, // Exposed for initialization logic
+    store: store, // Return original store, not storeWithHistory
+    // Expose helpers cho MainMenu
+    undo: scenario?.store.undo,
+    redo: scenario?.store.redo,
+    canUndo: scenario?.store.canUndo,
+    canRedo: scenario?.store.canRedo,
   };
 }
 
@@ -106,5 +132,16 @@ export function useScenario() {
 // In React, ReturnType of a hook includes the wrapper object. 
 // We extract the internal 'scenario' type.
 export type TScenarioHook = ReturnType<typeof useScenario>;
-export type TScenario = NonNullable<TScenarioHook["scenario"]>;
+type InferredScenario = NonNullable<TScenarioHook["scenario"]>;
+
+// Final exported type with explict timeZone definition override
+export type TScenario = Omit<InferredScenario, "time"> & {
+  time: InferredScenario["time"] & {
+    timeZone: string;
+  };
+};
 export type TGeo = ReturnType<typeof useGeo>;
+
+// Re-export useful utilities
+export { useScenarioState } from "./useScenarioState";
+export { useNewScenarioStore, type NewScenarioStore, type ScenarioState } from "./newScenarioStore";

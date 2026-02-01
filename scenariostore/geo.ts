@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { NewScenarioStore } from "@/scenariostore/newScenarioStore";
+import { useScenarioState } from "@/scenariostore/useScenarioState";
 import type { CurrentState } from "@/types/scenarioModels";
 import type {
   CurrentScenarioFeatureState,
@@ -21,6 +22,7 @@ import { klona } from "klona";
 import { moveItemMutable, nanoid, removeElement } from "@/utils";
 import type { DropTarget } from "@/components/types";
 import type { Geometry } from "geojson";
+import { updateCurrentUnitState } from "@/scenariostore/time";
 
 // --- Types ---
 
@@ -90,8 +92,12 @@ function createInitialFeatureState(
 
 // --- Main Hook ---
 
-export function useGeo(store: NewScenarioStore) {
-  const { state, update } = store;
+export function useGeo(store: NewScenarioStore | null) {
+  const state = useScenarioState(store);
+  const { update } = store || {};
+  
+  // Guard: Return empty/no-op implementation if state is not ready
+  const isReady = !!state;
   
   // Use constant references for event hooks so they persist across renders
   const mapLayerEvent = useMemo(() => createEventHook<ScenarioMapLayerEvent>(), []);
@@ -100,53 +106,60 @@ export function useGeo(store: NewScenarioStore) {
   // --- Computed / Memos ---
 
   const hiddenGroups = useMemo(() => {
+    if (!isReady) return new Set<string>();
     return new Set(
       Object.values(state.sideGroupMap)
         .filter((group) => !!(group.isHidden || state.sideMap[group._pid]?.isHidden))
         .map((group) => group.id),
     );
-  }, [state.sideGroupMap, state.sideMap]);
+  }, [isReady, state?.sideGroupMap, state?.sideMap]);
 
   const hiddenSides = useMemo(() => {
+    if (!isReady) return new Set<string>();
     return new Set(
       Object.values(state.sideMap)
         .filter((side) => !!side.isHidden)
         .map((side) => side.id),
     );
-  }, [state.sideMap]);
+  }, [isReady, state?.sideMap]);
 
   const everyVisibleUnit = useMemo(() => {
+    if (!isReady) return [];
     return Object.values(state.unitMap).filter(
       (unit) =>
         !(unit._gid
           ? hiddenGroups.has(unit._gid)
           : hiddenSides.has(unit._sid)) && unit._state?.location,
     );
-  }, [state.unitMap, hiddenGroups, hiddenSides]);
+  }, [isReady, state?.unitMap, hiddenGroups, hiddenSides]);
 
   const layers = useMemo(() => {
+    if (!isReady) return [];
     return state.layers
       .map((layerId) => state.layerMap[layerId])
       .map((layer) => ({
         ...layer,
         features: layer.features.map((featureId) => state.featureMap[featureId]),
       }));
-  }, [state.layers, state.layerMap, state.featureMap]);
+  }, [isReady, state?.layers, state?.layerMap, state?.featureMap]);
 
   const mapLayers = useMemo(() => {
+    if (!isReady) return [];
     return state.mapLayers.map((layerId) => state.mapLayerMap[layerId]);
-  }, [state.mapLayers, state.mapLayerMap]);
+  }, [isReady, state?.mapLayers, state?.mapLayerMap]);
 
   const layersFeatures = useMemo(() => {
+    if (!isReady) return [];
     return state.layers
       .map((layerId) => state.layerMap[layerId])
       .map((layer) => ({
         layer,
         features: layer.features.map((featureId) => state.featureMap[featureId]),
       }));
-  }, [state.layers, state.layerMap, state.featureMap]);
+  }, [isReady, state?.layers, state?.layerMap, state?.featureMap]);
 
   const itemsInfo = useMemo<LayerFeatureItem[]>(() => {
+    if (!isReady) return [];
     let items: LayerFeatureItem[] = [];
     layers.forEach((layer) => {
       items.push({ id: layer.id, type: "layer", name: layer.name });
@@ -172,6 +185,7 @@ export function useGeo(store: NewScenarioStore) {
     coordinates: Position | null,
     atTime?: number,
   ) {
+    if (!update) return;
     let newState: CurrentState | null = null;
     update(
       (s) => {
@@ -193,14 +207,14 @@ export function useGeo(store: NewScenarioStore) {
       },
       { label: "addUnitPosition", value: unitId },
     );
-    // Direct mutation of store state outside of update is risky in React, 
-    // but preserving original logic structure assuming store handles reactivity internally or we accept imperative updates here.
-    // Ideally this counter increment should be inside the update callback.
-    if (store.state.unitStateCounter !== undefined) {
-        // We can't easily mutate store.state directly in React if it's not a proxy.
-        // Assuming 'update' handles all mutations is safer.
-        // For now, ignoring the counter increment or assuming it happens via side-effect.
-    }
+    // Update the unit's _state to reflect the new position
+    update((s) => {
+      const unit = s.unitMap[unitId];
+      if (!unit) return;
+      const timestamp = s.currentTime;
+      updateCurrentUnitState(unit, timestamp);
+      s.unitStateCounter++;
+    });
   }
 
   function addFeatureStateGeometry(
@@ -208,6 +222,7 @@ export function useGeo(store: NewScenarioStore) {
     geometry: Geometry,
     atTime?: number,
   ) {
+    if (!update) return;
     let newState: CurrentScenarioFeatureState | null = null;
     update(
       (s) => {
@@ -234,6 +249,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function addLayer(data: NScenarioLayer) {
+    if (!update) return;
     const newLayer = klona({ ...data, _isNew: true });
     if (!newLayer.id) newLayer.id = nanoid();
     newLayer._isNew = true;
@@ -249,10 +265,11 @@ export function useGeo(store: NewScenarioStore) {
       .trigger({ type: "addLayer", id: newLayer.id, data: newLayer })
       .then();
 
-    return state.layerMap[newLayer.id];
+    return state?.layerMap[newLayer.id];
   }
 
   function addMapLayer(data: ScenarioMapLayer) {
+    if (!update) return;
     const newLayer = klona({
       opacity: 0.7,
       ...data,
@@ -268,10 +285,11 @@ export function useGeo(store: NewScenarioStore) {
       { label: "addMapLayer", value: newLayer.id },
     );
     mapLayerEvent.trigger({ type: "add", id: newLayer.id, data: newLayer }).then();
-    return state.mapLayerMap[newLayer.id];
+    return state?.mapLayerMap[newLayer.id];
   }
 
   function moveLayer(layerId: FeatureId, toIndex: number) {
+    if (!state || !update) return;
     const fromIndex = state.layers.indexOf(layerId);
     update(
       (s) => {
@@ -283,6 +301,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function moveMapLayer(layerId: FeatureId, options: MoveLayerOptions) {
+    if (!state || !update) return;
     const fromIndex = state.mapLayers.indexOf(layerId);
     const toIndex =
       options.toIndex ?? (options.direction === "up" ? fromIndex - 1 : fromIndex + 1);
@@ -296,6 +315,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function moveFeature(featureId: FeatureId, toIndex: number) {
+    if (!state || !update) return;
     const feature = state.featureMap[featureId];
 
     update(
@@ -318,6 +338,7 @@ export function useGeo(store: NewScenarioStore) {
     destinationFeatureOrLayerId: FeatureId,
     target: DropTarget,
   ) {
+    if (!state) return;
     const feature = state.featureMap[featureId];
     const destinationFeature = state.featureMap[destinationFeatureOrLayerId];
     const destinationLayerId = destinationFeature?._pid ?? destinationFeatureOrLayerId;
@@ -335,6 +356,7 @@ export function useGeo(store: NewScenarioStore) {
       if (fromIndex < toIndex) newIndex--;
       moveFeature(featureId, newIndex);
     } else {
+      if (!update) return;
       update(
         (s) => {
           const fromLayer = s.layerMap[feature._pid];
@@ -366,6 +388,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function getFullLayer(layerId: FeatureId): ScenarioLayer | undefined {
+    if (!state) return;
     const layer = state.layerMap[layerId];
     if (!layer) return;
     return { ...layer, features: layer.features.map((f) => klona(state.featureMap[f])) };
@@ -376,6 +399,7 @@ export function useGeo(store: NewScenarioStore) {
     data: ScenarioLayerUpdate,
     options: UpdateOptions = {},
   ) {
+    if (!update) return;
     const undoable = options.undoable ?? true;
     const noEmit = options.noEmit ?? false;
 
@@ -409,6 +433,7 @@ export function useGeo(store: NewScenarioStore) {
     data: ScenarioMapLayerUpdate,
     options: UpdateOptions = {},
   ) {
+    if (!update) return;
     const undoable = options.undoable ?? true;
     const noEmit = options.noEmit ?? false;
     const emitOnly = options.emitOnly ?? false;
@@ -435,6 +460,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function deleteLayer(layerId: FeatureId, options: UpdateOptions = {}) {
+    if (!update) return;
     const noEmit = options.noEmit ?? false;
     update(
       (s) => {
@@ -451,6 +477,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function deleteMapLayer(layerId: FeatureId, options: UpdateOptions = {}) {
+    if (!update) return;
     const noEmit = options.noEmit ?? false;
     update(
       (s) => {
@@ -470,6 +497,7 @@ export function useGeo(store: NewScenarioStore) {
     layerId: FeatureId,
     options: UpdateOptions = {},
   ) {
+    if (!update) return;
     const noEmit = options.noEmit ?? false;
     const newFeature = klona(data) as NScenarioFeature;
     if (!newFeature.id) newFeature.id = nanoid();
@@ -493,6 +521,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function deleteFeature(featureId: FeatureId, options: UpdateOptions = {}) {
+    if (!state || !update) return;
     const noEmit = options.noEmit ?? false;
     const feature = state.featureMap[featureId];
     if (!feature) return;
@@ -509,6 +538,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function duplicateFeature(featureId: FeatureId) {
+    if (!state) return;
     const feature = state.featureMap[featureId];
     if (!feature) return;
     const shallowCopy = { ...feature };
@@ -521,6 +551,7 @@ export function useGeo(store: NewScenarioStore) {
     data: ScenarioFeatureUpdate,
     options: UpdateOptions = {},
   ) {
+    if (!update) return;
     const undoable = options.undoable ?? true;
     const noEmit = options.noEmit ?? false;
     const isGeometry = data.geometry !== undefined;
@@ -570,6 +601,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function deleteFeatureStateEntry(featureId: FeatureId, index: number) {
+    if (!update) return;
     update((s) => {
       const _feature = s.featureMap[featureId];
       if (!_feature) return;
@@ -580,6 +612,7 @@ export function useGeo(store: NewScenarioStore) {
   }
 
   function updateFeatureState(featureId: FeatureId, undoable = false) {
+    if (!state || !update) return;
     const feature = state.featureMap[featureId];
     if (!feature) return;
     const timestamp = state.currentTime;
@@ -611,9 +644,10 @@ export function useGeo(store: NewScenarioStore) {
     everyVisibleUnit,
     addUnitPosition,
     addLayer,
-    getLayerById: (id: FeatureId) => state.layerMap[id],
+    getLayerById: (id: FeatureId) => state?.layerMap[id],
     getFullLayer,
     getFeatureById: (id: FeatureId) => {
+      if (!state) return { feature: undefined, layer: undefined };
       const feature = state.featureMap[id];
       if (!feature) return { feature, layer: undefined };
       return { feature, layer: state.layerMap[feature._pid] };
@@ -621,7 +655,7 @@ export function useGeo(store: NewScenarioStore) {
     moveFeature,
     updateLayer,
     deleteLayer,
-    getLayerIndex: (id: FeatureId) => state.layers.indexOf(id),
+    getLayerIndex: (id: FeatureId) => state?.layers.indexOf(id) ?? -1,
     moveLayer,
     addFeature,
     duplicateFeature,
@@ -635,8 +669,8 @@ export function useGeo(store: NewScenarioStore) {
     addMapLayer,
     deleteMapLayer,
     updateMapLayer,
-    getMapLayerById: (id: FeatureId) => state.mapLayerMap[id],
-    getMapLayerIndex: (id: FeatureId) => state.mapLayers.indexOf(id),
+    getMapLayerById: (id: FeatureId) => state?.mapLayerMap[id],
+    getMapLayerIndex: (id: FeatureId) => state?.mapLayers.indexOf(id) ?? -1,
     onMapLayerEvent: mapLayerEvent.on,
     onFeatureLayerEvent: featureLayerEvent.on,
     moveMapLayer,

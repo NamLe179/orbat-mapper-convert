@@ -49,6 +49,7 @@ import { klona } from "klona";
 // Stores / Contexts (Assumed Hooks)
 import { useActiveScenario } from "@/components/injects";
 import { useMapSettingsStore } from "@/stores/mapSettingsStore";
+import { useSymbolSettingsStore } from "@/stores/settingsStore";
 import { useSelectedItems } from "@/stores/selectedStore";
 import type { EntityId } from "@/types/base";
 import type { TScenario } from "@/scenariostore";
@@ -64,6 +65,9 @@ export function calculateZoomToResolution(view: View) {
 }
 // Init once
 calculateZoomToResolution(new View());
+
+// Separate map to track cache keys for units (avoids mutating frozen objects)
+const unitCacheKeyMap = new Map<string, string>();
 
 const unitLabelStyle = new Style({
   text: new Text({
@@ -97,6 +101,7 @@ export function useUnitLayer(olMap: OLMap | null) {
   } = scenario;
 
   const mapSettings = useMapSettingsStore();
+  const symbolSettings = useSymbolSettingsStore();
 
   // 1. Create Layers (Memoized)
   const { unitLayer, labelLayer } = useMemo(() => {
@@ -120,13 +125,13 @@ export function useUnitLayer(olMap: OLMap | null) {
   // UseRef để giữ các hàm này stable mà vẫn truy cập được state mới nhất nếu cần
   // Tuy nhiên, vì các dependency (scenario, settings) thay đổi, ta cần cập nhật ref.
   
-  const ctxRef = useRef({ scenario, mapSettings });
+  const ctxRef = useRef({ scenario, mapSettings, symbolSettings });
   useEffect(() => {
-    ctxRef.current = { scenario, mapSettings };
-  }, [scenario, mapSettings]);
+    ctxRef.current = { scenario, mapSettings, symbolSettings };
+  }, [scenario, mapSettings, symbolSettings]);
 
   const unitStyleFunction = useCallback((feature: FeatureLike, resolution: number) => {
-    const { scenario, mapSettings } = ctxRef.current;
+    const { scenario, mapSettings, symbolSettings } = ctxRef.current;
     const unitId = feature.getId() as string;
     const unit = scenario.helpers.getUnitById(unitId);
 
@@ -140,20 +145,22 @@ export function useUnitLayer(olMap: OLMap | null) {
       return;
     }
 
-    let unitStyle = unitStyleCache.get(unit._ikey ?? unitId);
+    // Use separate cache key map to avoid mutating frozen unit object
+    const cacheKey = unitCacheKeyMap.get(unitId);
+    let unitStyle = cacheKey ? unitStyleCache.get(cacheKey) : undefined;
     if (!unitStyle) {
       const symbolOptions = scenario.unitActions.getCombinedSymbolOptions(unit);
-      const { style, cacheKey } = createUnitStyle(unit, symbolOptions, scenario);
+      const { style, cacheKey: newCacheKey } = createUnitStyle(unit, symbolOptions, scenario, mapSettings, symbolSettings);
       unitStyle = style;
-      // Side effect mutation (careful in React, but okay for OL cache)
-      unit._ikey = cacheKey; 
-      unitStyleCache.set(unit._ikey ?? unitId, unitStyle);
+      // Store cache key in separate map instead of mutating unit
+      unitCacheKeyMap.set(unitId, newCacheKey);
+      unitStyleCache.set(newCacheKey, unitStyle);
     }
     return unitStyle;
   }, []); // Empty dep, relies on ctxRef
 
   const labelStyleFunction = useCallback((feature: FeatureLike, resolution: number) => {
-    const { scenario, mapSettings } = ctxRef.current;
+    const { scenario, mapSettings, symbolSettings } = ctxRef.current;
     const unitId = feature.getId() as string;
     const unit = scenario.helpers.getUnitById(unitId);
     
@@ -279,6 +286,7 @@ export function useMapDrop(
     if (!olMap) return;
     
     const element = olMap.getTargetElement();
+    if (!element) return;
     
     const cleanup = dropTargetForElements({
       element: element,
@@ -445,6 +453,7 @@ export function useUnitSelectInteraction(
 ) {
   const { enable = true, enableBoxSelect = true } = options;
   const mapSettings = useMapSettingsStore();
+  const symbolSettings = useSymbolSettingsStore();
   
   // Context refs
   const { selectedUnitIds, clear: clearSelectedItems, addSelectedUnitId: addSelectedId, deleteSelectedUnitId: deleteSelectedId } = useSelectedItems(); // Assuming methods exist
@@ -481,6 +490,8 @@ export function useUnitSelectInteraction(
             outlineWidth: 21,
           },
           scenario,
+          mapSettings,
+          symbolSettings,
           "yellow",
         )!;
         unitStyle = style;

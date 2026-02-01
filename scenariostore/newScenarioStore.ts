@@ -566,7 +566,10 @@ export function useNewScenarioStore(data: Scenario): NewScenarioStore {
       undoRedoListeners.add(callback);
       return () => undoRedoListeners.delete(callback);
     },
-    subscribe: store.subscribe,
+    subscribe: (listener) => {
+      // Wrap Zustand's subscribe to match our expected signature
+      return store.subscribe(listener);
+    },
     _store: store
   };
 

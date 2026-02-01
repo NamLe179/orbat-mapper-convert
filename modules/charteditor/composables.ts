@@ -31,7 +31,7 @@ export function useChartSettings(chartElementType: ChartItemType) {
       default:
         return {};
     }
-  }, [chartElementType, mOptions, chartSettings]);
+  }, [chartElementType, mOptions, chartSettings]) as any;
 
   // 3. Computed: Current Selected Element Identifier
   const currentElement = useMemo(() => {

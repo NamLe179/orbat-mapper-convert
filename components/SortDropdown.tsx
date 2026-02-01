@@ -15,9 +15,10 @@ interface SortDropdownProps {
   // Giả định MenuItemData có action kiểu string | Function tương tự Vue
   options: MenuItemData[]; 
   onAction?: (action: any) => void;
+  className?: string;
 }
 
-export default function SortDropdown({ options, onAction }: SortDropdownProps) {
+export default function SortDropdown({ options, onAction, className }: SortDropdownProps) {
   
   const handleItemClick = (item: MenuItemData) => {
     if (typeof item.action === "function") {
@@ -28,7 +29,8 @@ export default function SortDropdown({ options, onAction }: SortDropdownProps) {
   };
 
   return (
-    <DropdownMenu>
+    <div className={className}>
+      <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
         <Button variant="ghost">
           Sort
@@ -48,5 +50,6 @@ export default function SortDropdown({ options, onAction }: SortDropdownProps) {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+    </div>
   );
 }

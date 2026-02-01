@@ -37,14 +37,15 @@ import type { TScenario } from "@/scenariostore";
 import type { MenuItemData } from "@/components/types";
 import type { UseFeatureStyles } from "@/geo/featureStyles";
 
-// TODO: Replace Vue Icons with React Icons (e.g., from lucide-react or @iconify/react)
-// import { ... } from "lucide-react";
-const IconMapMarker = "IconMapMarker"; // Placeholder
-const IconVectorLine = "IconVectorLine"; // Placeholder
-const IconVectorTriangle = "IconVectorTriangle"; // Placeholder
-const IconVectorCircleVariant = "IconVectorCircleVariant"; // Placeholder
-const IconMapMarkerMultipleOutline = "IconMapMarkerMultipleOutline"; // Placeholder
-const IconLayersOutline = "IconLayersOutline"; // Placeholder
+// React Icons
+import { 
+  MapPin, 
+  Minus, 
+  Triangle, 
+  Circle as CircleIcon, 
+  MapPinned, 
+  Layers 
+} from "lucide-react";
 
 const selectStyle = new Style({
   stroke: new Stroke({ color: "#ffff00", width: 9 }),
@@ -73,14 +74,14 @@ export const LayerTypes = {
 
 export type LayerType = (typeof LayerTypes)[keyof typeof LayerTypes];
 
-// React components or string identifiers for icons
+// React components for geometry icons
 const geometryIconMap: any = {
-  Point: IconMapMarker,
-  LineString: IconVectorLine,
-  Polygon: IconVectorTriangle,
-  Circle: IconVectorCircleVariant,
-  GeometryCollection: IconMapMarkerMultipleOutline,
-  layer: IconLayersOutline,
+  Point: MapPin,
+  LineString: Minus,
+  Polygon: Triangle,
+  Circle: CircleIcon,
+  GeometryCollection: MapPinned,
+  layer: Layers,
 };
 
 export function getGeometryIcon(feature?: ScenarioFeature | NScenarioFeature) {
@@ -128,11 +129,12 @@ export function createScenarioLayerFeatures(
       };
     }
 
-    feature.meta._zIndex = index;
-    if (feature.meta?.radius && feature.geometry.type === "Point") {
+    // Clone meta to avoid mutating frozen object
+    const meta = { ...feature.meta, _zIndex: index };
+    if (meta?.radius && feature.geometry.type === "Point") {
       const newRadius = convertRadius(
         feature as GeoJsonFeature<Point>,
-        feature.meta.radius,
+        meta.radius,
       );
       const circle = new Circle(
         fromLonLat(feature.geometry.coordinates as number[]),
@@ -254,7 +256,7 @@ export function useScenarioFeatureSelect(
 }
 
 export function useFeatureLayerUtils(
-  olMap: OLMap,
+  olMap: OLMap | null,
   options: { activeScenario?: TScenario; activeScenarioFeatures?: UseFeatureStyles } = {},
 ) {
   // Use passed scenario or fall back to context hook
@@ -270,7 +272,7 @@ export function useFeatureLayerUtils(
     store: { state },
   } = activeScenario;
 
-  const scenarioLayersGroup = getOrCreateLayerGroup(olMap);
+  const scenarioLayersGroup = olMap ? getOrCreateLayerGroup(olMap) : new LayerGroup();
   const scenarioLayersOl = scenarioLayersGroup.getLayers() as Collection<VectorLayer<any>>;
 
   const getOlLayerById = useCallback((layerId: FeatureId) => {
@@ -282,12 +284,12 @@ export function useFeatureLayerUtils(
   const zoomToFeature = useCallback((featureId: FeatureId) => {
     const { feature: olFeature } =
       getFeatureAndLayerById(featureId, scenarioLayersOl) || {};
-    if (!olFeature?.getGeometry()) return;
+    if (!olFeature?.getGeometry() || !olMap) return;
     olMap.getView().fit(olFeature.getGeometry() as SimpleGeometry, { maxZoom: 15 });
   }, [olMap, scenarioLayersOl]);
 
   const zoomToFeatures = useCallback((featureIds: FeatureId[]) => {
-    if (!featureIds.length) return;
+    if (!featureIds.length || !olMap) return;
     const features = featureIds.map((fid) => state.featureMap[fid]).filter(Boolean);
     if (!features.length) return;
 
@@ -305,7 +307,7 @@ export function useFeatureLayerUtils(
   const panToFeature = useCallback((featureId: FeatureId) => {
     const { feature: olFeature } =
       getFeatureAndLayerById(featureId, scenarioLayersOl) || {};
-    if (!olFeature) return;
+    if (!olFeature || !olMap) return;
     const view = olMap.getView();
     const extent = olFeature?.getGeometry()?.getExtent();
     if (extent) {
@@ -317,7 +319,7 @@ export function useFeatureLayerUtils(
 
   const zoomToLayer = useCallback((layerId: FeatureId) => {
     const olLayer = getOlLayerById(layerId);
-    if (!olLayer) return;
+    if (!olLayer || !olMap) return;
     const layerExtent = olLayer.getSource()?.getExtent();
 
     if (layerExtent && !isEmpty(layerExtent)) {

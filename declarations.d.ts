@@ -11,3 +11,4 @@ declare module "ol-ext/interaction/Transform";
 declare module "ol-ext/source/DayNight";
 
 declare module "@orbat-mapper/convert-symbology";
+declare module "d3-scale-chromatic";

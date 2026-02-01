@@ -2,10 +2,10 @@ import { Icon, Style } from "ol/style";
 import type { CustomSymbol, UnitSymbolOptions } from "@/types/scenarioModels";
 import { symbolGenerator } from "@/symbology/milsymbwrapper";
 import type { Symbol as MilSymbol } from "milsymbol";
-import { useSymbolSettingsStore } from "@/stores/settingsStore";
+import type { SymbolSettingsState } from "@/stores/settingsStore";
 import type { NUnit } from "@/types/internalModels";
 import { hashObject, wordWrap } from "@/utils";
-import { useMapSettingsStore } from "@/stores/mapSettingsStore";
+import type { MapSettingsState } from "@/stores/mapSettingsStore";
 import type { TScenario } from "@/scenariostore";
 import { CUSTOM_SYMBOL_PREFIX, CUSTOM_SYMBOL_SLICE } from "@/config/constants";
 
@@ -64,13 +64,12 @@ export function createUnitStyle(
   unit: NUnit,
   symbolOptions: UnitSymbolOptions,
   scenario: TScenario,
+  mapSettings: MapSettingsState,
+  symbolSettings: SymbolSettingsState,
   color?: string,
 ): { style: Style; cacheKey: string } {
   const { name = "", shortName = "" } = unit;
   const sidc = unit._state?.sidc || unit.sidc;
-
-  const mapSettingsStore = useMapSettingsStore();
-  const symbolSettings = useSymbolSettingsStore();
 
   const { uniqueDesignation = shortName || name, ...textAmplifiers } =
     unit.textAmplifiers || {};
@@ -83,7 +82,7 @@ export function createUnitStyle(
       style: customSymbol
         ? createCustomSymbolStyle(
             customSymbol,
-            mapSettingsStore.mapIconSize * (mapSettingsStore.mapCustomIconScale || 1.7),
+            mapSettings.mapIconSize * (mapSettings.mapCustomIconScale || 1.7),
             color,
           )
         : new Style(),
@@ -91,8 +90,8 @@ export function createUnitStyle(
     };
   }
   const options = {
-    size: mapSettingsStore.mapIconSize * (window.devicePixelRatio || 1),
-    uniqueDesignation: mapSettingsStore.mapUnitLabelBelow ? "" : uniqueDesignation,
+    size: mapSettings.mapIconSize * (window.devicePixelRatio || 1),
+    uniqueDesignation: mapSettings.mapUnitLabelBelow ? "" : uniqueDesignation,
     outlineColor: "white",
     outlineWidth: 8,
     ...textAmplifiers,

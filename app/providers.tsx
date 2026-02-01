@@ -1,25 +1,13 @@
 "use client";
 
-import { Toaster as Sonner } from "sonner";
-import { useEffect } from "react";
+import { ThemeProvider } from "next-themes";
 
-// Store initialization will be handled differently in React
-// You'll need to convert Pinia stores to Zustand or React Context
-
-interface ProvidersProps {
-  children: React.ReactNode;
-}
-
-export function Providers({ children }: ProvidersProps) {
-  useEffect(() => {
-    // Initialize stores here (equivalent to entityTypeStore.init())
-    // This will be implemented when converting stores
-  }, []);
-
+// This file replaces Vue's main.ts initialization
+// Add any global providers here (state management, theme, etc.)
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       {children}
-      <Sonner className="pointer-events-auto" />
-    </>
+    </ThemeProvider>
   );
 }

@@ -85,6 +85,15 @@ export function useActiveParent() {
 }
 
 export function useActiveLayer() {
+  const context = useContext(ActiveLayerContext);
+  if (context === null) {
+    throw new Error("useActiveLayer must be used within ActiveLayerProvider");
+  }
+  return context;
+}
+
+// Optional version that returns null instead of throwing
+export function useActiveLayerOptional() {
   return useContext(ActiveLayerContext);
 }
 
@@ -96,6 +105,11 @@ export function useActiveScenario() {
   return context;
 }
 
+// Optional version that returns null instead of throwing
+export function useActiveScenarioOptional() {
+  return useContext(ActiveScenarioContext);
+}
+
 export function useActiveFeatureStyles() {
   return useContext(ActiveFeatureStylesContext);
 }
@@ -105,7 +119,11 @@ export function useCurrentScenarioTab() {
 }
 
 export function useTimeModal() {
-  return useContext(TimeModalContext);
+  const context = useContext(TimeModalContext);
+  if (!context) {
+    throw new Error("useTimeModal must be used within a TimeModalProvider");
+  }
+  return context;
 }
 
 export function useSidcModal() {

@@ -101,6 +101,12 @@ export function useToolbarUnitSymbolData() {
   // EmtStore logic: Ref được dùng để giữ trạng thái local mutable mà không gây re-render
   // Logic này trong Vue dùng để nhớ echelon cho mỗi symbol set
   const emtStoreRef = useRef<Record<string, string>>({ [UNIT_SYMBOLSET_VALUE]: "16" });
+  const currentEchelonRef = useRef(currentEchelon);
+
+  // Update ref when currentEchelon changes
+  useEffect(() => {
+    currentEchelonRef.current = currentEchelon;
+  }, [currentEchelon]);
 
   const symbolSetValue = useMemo(() => new Sidc(activeSidc).symbolSet, [activeSidc]);
 
@@ -178,24 +184,18 @@ export function useToolbarUnitSymbolData() {
   }, [symbolSetValue, currentSid]);
 
   // Watcher Logic: Chuyển đổi echelon khi symbolSet thay đổi
-  // Sử dụng useRef để track giá trị cũ (previous value)
-  const prevSymbolSetRef = useRef(symbolSetValue);
-
-  useEffect(() => {
-    if (prevSymbolSetRef.current !== symbolSetValue) {
-      const oldSet = prevSymbolSetRef.current;
-      const newSet = symbolSetValue;
-      
-      // Lưu giá trị echelon hiện tại vào store cho set cũ
-      emtStoreRef.current[oldSet] = currentEchelon;
-      
-      // Load giá trị echelon đã lưu cho set mới (hoặc default '00')
-      const nextEchelon = emtStoreRef.current[newSet] || "00";
-      setCurrentEchelon(nextEchelon);
-      
-      prevSymbolSetRef.current = newSet;
-    }
-  }, [symbolSetValue, currentEchelon, setCurrentEchelon]);
+  // DISABLED: This was causing infinite loops
+  // const prevSymbolSetRef = useRef(symbolSetValue);
+  // useEffect(() => {
+  //   if (prevSymbolSetRef.current !== symbolSetValue) {
+  //     const oldSet = prevSymbolSetRef.current;
+  //     const newSet = symbolSetValue;
+  //     emtStoreRef.current[oldSet] = currentEchelonRef.current;
+  //     const nextEchelon = emtStoreRef.current[newSet] || "00";
+  //     setCurrentEchelon(nextEchelon);
+  //     prevSymbolSetRef.current = newSet;
+  //   }
+  // }, [symbolSetValue]);
 
   return {
     currentSid,
