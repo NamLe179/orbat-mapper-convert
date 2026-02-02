@@ -48,6 +48,7 @@ const SymbolPickerModal = dynamic(() => import("@/components/SymbolPickerModal")
 const InputDateModal = dynamic(() => import("@/components/InputDateModal"), { ssr: false });
 const ExportScenarioModal = dynamic(() => import("@/components/ExportScenarioModal"), { ssr: false });
 const ImportModal = dynamic(() => import("@/components/ImportModal"), { ssr: false });
+const EncryptScenarioModal = dynamic(() => import("@/components/EncryptScenarioModal"), { ssr: false });
 
 export default function ScenarioEditor({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showEncryptModal, setShowEncryptModal] = useState(false);
   const [shortcutsVisible, setShortcutsVisible] = useState(false);
   const [activeLayerId, setActiveLayerId] = useState<FeatureId | null>(null);
 
@@ -115,14 +117,78 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
   // --- Handlers ---
   const onScenarioAction = async (action: string) => {
     switch (action) {
+      case "undo":
+        undo();
+        break;
+      case "redo":
+        redo();
+        break;
       case "save":
         const newId = await scn.io.saveToIndexedDb();
         send({ message: "Scenario saved" });
         if (state.id !== newId) router.push(`/${MAP_EDIT_MODE_ROUTE}/${newId}`);
         break;
-      case "loadNew": setShowLoadModal(true); break;
-      case "export": setShowExportModal(true); break;
-      case "import": setShowImportModal(true); break;
+      case "exportJson":
+        await scn.io.downloadAsJson();
+        send({ message: "Scenario downloaded" });
+        break;
+      case "exportEncrypted":
+        setShowEncryptModal(true);
+        break;
+      case "createNew":
+        router.push(`/${NEW_SCENARIO_ROUTE}`);
+        break;
+      case "loadNew": 
+        setShowLoadModal(true); 
+        break;
+      case "export": 
+        setShowExportModal(true); 
+        break;
+      case "import": 
+        setShowImportModal(true); 
+        break;
+      case "share":
+        try {
+          const result = await shareScenario(scn);
+          send({ message: result.warning || "Scenario shared successfully" });
+        } catch (e: any) {
+          send({ message: e.message || "Failed to share scenario", type: "error" });
+        }
+        break;
+      case "shareAsUrl":
+        try {
+          const result = await shareScenario(scn);
+          await navigator.clipboard.writeText(result.url);
+          send({ message: "Share URL copied to clipboard" });
+          if (result.warning) {
+            send({ message: result.warning, type: "warning" });
+          }
+        } catch (e: any) {
+          send({ message: e.message || "Failed to generate share URL", type: "error" });
+        }
+        break;
+      case "exportToImage":
+        send({ message: "Export to image feature coming soon" });
+        // TODO: Implement map screenshot functionality
+        break;
+      case "exportToClipboard":
+        try {
+          const scenarioJson = JSON.stringify(scn.store.state, null, 2);
+          await navigator.clipboard.writeText(scenarioJson);
+          send({ message: "Scenario copied to clipboard" });
+        } catch (e: any) {
+          send({ message: "Failed to copy to clipboard", type: "error" });
+        }
+        break;
+      case "duplicate":
+        try {
+          const duplicatedId = await scn.io.duplicateScenario();
+          send({ message: "Scenario duplicated" });
+          router.push(`/${MAP_EDIT_MODE_ROUTE}/${duplicatedId}`);
+        } catch (e: any) {
+          send({ message: "Failed to duplicate scenario", type: "error" });
+        }
+        break;
       case "showInfo": 
         selectedItems.clear(); 
         selectedItems.setShowScenarioInfo(true); 
@@ -151,7 +217,13 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
         {/* Top Navigation Bar */}
         <nav className="flex shrink-0 items-center justify-between py-1 pr-4 pl-6 border-b print:hidden">
         <div className="flex min-w-0 flex-auto items-center gap-2">
-          <MainMenu onAction={onScenarioAction} onUiAction={(act) => act === 'showSearch' && uiStore.setShowSearch(true)} />
+          <MainMenu 
+            onAction={onScenarioAction} 
+            onUiAction={(act) => {
+              if (act === 'showSearch') uiStore.setShowSearch(true);
+              if (act === 'showKeyboardShortcuts') setShortcutsVisible(true);
+            }} 
+          />
           <Button 
             variant="ghost" 
             className="hidden truncate font-medium sm:inline-flex" 
@@ -177,10 +249,24 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
 
           {/* History Controls */}
           <div className="flex items-center border-l pl-2">
-            <Button variant="ghost" size="icon" onClick={() => undo()} disabled={!canUndo} title="Undo (Ctrl+Z)">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => undo()} 
+              disabled={!canUndo} 
+              title="Undo (Ctrl+Z)"
+              className={!canUndo ? "opacity-40 cursor-not-allowed" : ""}
+            >
               <Undo2 className="size-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => redo()} disabled={!canRedo} title="Redo">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => redo()} 
+              disabled={!canRedo} 
+              title="Redo (Ctrl+Shift+Z)"
+              className={!canRedo ? "opacity-40 cursor-not-allowed" : ""}
+            >
               <Redo2 className="size-5" />
             </Button>
           </div>
@@ -238,6 +324,8 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
       )}
 
       {showImportModal && <ImportModal open={showImportModal} onOpenChange={setShowImportModal} />}
+      
+      {showEncryptModal && <EncryptScenarioModal open={showEncryptModal} onOpenChange={setShowEncryptModal} />}
 
       {/* File Drop Overlay */}
       {isOverDropZone && (

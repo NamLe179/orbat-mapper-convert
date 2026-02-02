@@ -126,7 +126,20 @@ export default function ImportScenarioPage() {
       id: newId,
     };
 
+    console.log("[ImportPage] Saving scenario with ID:", newId);
     await db.putScenario(newScenario);
+    
+    // Verify scenario was saved
+    const saved = await db.getScenarioInfo(newId);
+    console.log("[ImportPage] Scenario saved successfully:", saved ? "yes" : "no");
+    
+    if (!saved) {
+      console.error("[ImportPage] Failed to save scenario to IndexedDB");
+      setError("Failed to save scenario to browser storage.");
+      return;
+    }
+    
+    console.log("[ImportPage] Navigating to /scenario/" + newId);
     router.push(`/scenario/${newId}`);
   }
 

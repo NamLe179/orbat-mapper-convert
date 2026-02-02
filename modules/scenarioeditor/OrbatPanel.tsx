@@ -211,10 +211,43 @@ export default function OrbatPanel({ hideFilter = false, headerSlot }: Props) {
             onUnitAction={onUnitAction}
             onUnitClick={handleUnitClick}
             onSideAction={(side, action) => {
-              // Chuyển đổi logic SideAction từ Vue
-              if (action === SideActions.Delete) unitActions.deleteSide(side.id);
-              if (action === SideActions.MoveUp) unitActions.reorderSide(side.id, "up");
-              // ... các hành động khác
+              console.log("Side action:", action, "for side:", side.id);
+              switch (action) {
+                case SideActions.Delete:
+                  unitActions.deleteSide(side.id);
+                  break;
+                case SideActions.MoveUp:
+                  unitActions.reorderSide(side.id, "up");
+                  break;
+                case SideActions.MoveDown:
+                  unitActions.reorderSide(side.id, "down");
+                  break;
+                case SideActions.Clone:
+                  unitActions.cloneSide(side.id);
+                  break;
+                case SideActions.CloneWithState:
+                  unitActions.cloneSide(side.id, { includeState: true });
+                  break;
+                case SideActions.Lock:
+                  unitActions.updateSide(side.id, { locked: true });
+                  break;
+                case SideActions.Unlock:
+                  unitActions.updateSide(side.id, { locked: false });
+                  break;
+                case SideActions.Hide:
+                  unitActions.updateSide(side.id, { isHidden: true });
+                  break;
+                case SideActions.Show:
+                  unitActions.updateSide(side.id, { isHidden: false });
+                  break;
+                case SideActions.Add:
+                  console.log("Adding new side");
+                  const newSideId = unitActions.addSide();
+                  console.log("New side created with ID:", newSideId);
+                  break;
+                default:
+                  console.warn("Unhandled side action:", action);
+              }
             }}
             hideFilter={hideFilter}
           />
@@ -225,7 +258,11 @@ export default function OrbatPanel({ hideFilter = false, headerSlot }: Props) {
         <div className="mt-8">
           <OrbatPanelAddSide
             simple={sides.length >= 1}
-            onAdd={() => unitActions.addSide()}
+            onAdd={() => {
+              console.log("Add side button clicked");
+              const newSideId = unitActions.addSide();
+              console.log("New side created with ID:", newSideId);
+            }}
           />
         </div>
       )}

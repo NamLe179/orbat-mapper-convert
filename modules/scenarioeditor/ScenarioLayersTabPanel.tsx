@@ -80,8 +80,10 @@ export default function ScenarioLayersTabPanel({
       features: [],
       _isNew: false,
     });
-    setActiveLayerId?.(addedLayer.id);
-    setEditedLayerId(addedLayer.id);
+    if (addedLayer) {
+      setActiveLayerId?.(addedLayer.id);
+      setEditedLayerId(addedLayer.id);
+    }
     return addedLayer;
   };
 
@@ -131,6 +133,43 @@ export default function ScenarioLayersTabPanel({
   // --- Feature & Layer Actions ---
   const onFeatureAction = (featureIds: FeatureId | FeatureId[], action: string) => {
     const ids = Array.isArray(featureIds) ? featureIds : [featureIds];
+    
+    // Single item actions
+    if (ids.length === 1) {
+      const id = ids[0];
+      const result = geo.getFeatureById(id);
+      if (!result.feature || !result.layer) return;
+      
+      if (action === "setActive") {
+        selectedItems.setActiveFeatureId(id);
+        return;
+      }
+      if (action === "edit") {
+        selectedItems.setActiveFeatureId(id);
+        // TODO: Open feature edit form/panel
+        return;
+      }
+      if (action === "moveUp") {
+        const idx = result.layer.features.indexOf(id);
+        if (idx > 0) {
+          geo.moveFeature(id, idx - 1);
+        }
+        return;
+      }
+      if (action === "moveDown") {
+        const idx = result.layer.features.indexOf(id);
+        if (idx < result.layer.features.length - 1) {
+          geo.moveFeature(id, idx + 1);
+        }
+        return;
+      }
+      if (action === "duplicate") {
+        geo.duplicateFeature(id);
+        return;
+      }
+    }
+    
+    // Batch actions
     groupUpdate(() => {
       ids.forEach(id => {
         if (action === "zoom") zoomToFeature(id);
@@ -151,6 +190,15 @@ export default function ScenarioLayersTabPanel({
           label="Map layers" 
           open={uiStore.mapLayersPanelOpen}
           onOpenChange={uiStore.setMapLayersPanelOpen}
+          right={
+            <DotsMenu 
+              items={[
+                { label: "Add image layer", action: () => addNewMapLayer("ImageLayer") },
+                { label: "Add TileJSON layer", action: () => addNewMapLayer("TileJSONLayer") },
+                { label: "Add XYZ tile layer", action: () => addNewMapLayer("XYZLayer") }
+              ]}
+            />
+          }
         >
           
           
@@ -218,7 +266,28 @@ export default function ScenarioLayersTabPanel({
             }}
             onFeatureAction={onFeatureAction}
             onLayerAction={(layer, action) => {
-              // Handle layer actions if needed
+              if (action === ScenarioLayerActions.Zoom) {
+                zoomToLayer(layer.id);
+              } else if (action === ScenarioLayerActions.SetActive) {
+                setActiveLayerId?.(layer.id);
+              } else if (action === ScenarioLayerActions.Edit) {
+                setEditedLayerId(layer.id);
+              } else if (action === ScenarioLayerActions.MoveUp) {
+                const idx = geo.getLayerIndex(layer.id);
+                if (idx > 0) {
+                  geo.moveLayer(layer.id, idx - 1);
+                }
+              } else if (action === ScenarioLayerActions.MoveDown) {
+                const idx = geo.getLayerIndex(layer.id);
+                const totalLayers = geo.layers.length;
+                if (idx < totalLayers - 1) {
+                  geo.moveLayer(layer.id, idx + 1);
+                }
+              } else if (action === ScenarioLayerActions.Delete) {
+                geo.deleteLayer(layer.id);
+                if (activeLayerId === layer.id) setActiveLayerId?.(null);
+                if (editedLayerId === layer.id) setEditedLayerId(null);
+              }
             }}
           />
         ))}
@@ -229,6 +298,7 @@ export default function ScenarioLayersTabPanel({
           items={[
             { label: "Add feature layer", onClick: addNewLayer },
             { label: "Add image layer", onClick: () => addNewMapLayer("ImageLayer") },
+            { label: "Add TileJSON layer", onClick: () => addNewMapLayer("TileJSONLayer") },
             { label: "Add XYZ tile layer", onClick: () => addNewMapLayer("XYZLayer") }
           ]} 
         />

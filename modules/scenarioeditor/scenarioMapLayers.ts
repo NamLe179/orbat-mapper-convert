@@ -302,8 +302,12 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
         }
     }
 
-    function addLayer(layerId: FeatureId) {
-        const mapLayer = scn!.geo.getMapLayerById(layerId);
+    function addLayer(layerId: FeatureId, mapLayerData?: ScenarioMapLayer) {
+        const mapLayer = mapLayerData || scn!.geo.getMapLayerById(layerId);
+        if (!mapLayer) {
+          console.error("Map layer not found:", layerId);
+          return;
+        }
         if (mapLayer.type === "ImageLayer") addImageLayer(mapLayer);
         if (mapLayer.type === "TileJSONLayer") addTileJSONLayer(mapLayer);
         if (mapLayer.type === "XYZLayer") addXYZLayer(mapLayer);
@@ -326,9 +330,10 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
         }
     
         if (
-          mapLayer.type === "TileJSONLayer" ||
+          mapLayer &&
+          (mapLayer.type === "TileJSONLayer" ||
           mapLayer.type === "XYZLayer" ||
-          mapLayer.type === "ImageLayer"
+          mapLayer.type === "ImageLayer")
         ) {
           if ("url" in data && data.url !== undefined) {
             deleteLayer(layerId);
@@ -337,7 +342,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
           }
         }
     
-        if (mapLayer.type === "ImageLayer") {
+        if (mapLayer && mapLayer.type === "ImageLayer") {
           const d = data as ScenarioImageLayer;
           if (d.imageCenter !== undefined) {
             layer.getSource().setCenter(fromLonLat(d.imageCenter));
@@ -368,7 +373,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
     // 3. Subscriptions
     const mapLayerEventHandle = scn.geo.onMapLayerEvent((event) => {
         if (event.type === "add") {
-          addLayer(event.id);
+          addLayer(event.id, event.data as ScenarioMapLayer);
         } else if (event.type === "remove") {
           deleteLayer(event.id);
         } else if (event.type === "update") {
@@ -403,7 +408,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
           }
         } else if (label === "updateMapLayer") {
           const data = scn!.geo.getMapLayerById(layerId);
-          updateLayer(layerId, data);
+          if (data) updateLayer(layerId, data);
           if (imageTransformIsActive) {
             const olLayer = getOlLayerById(layerId);
             startTransform(olLayer, layerId);
@@ -510,7 +515,7 @@ export function addMapLayer(
       url: "",
       _status: "uninitialized",
       _isNew: true,
-    });
+    })!;
   } else if (layerType === "XYZLayer") {
     newLayer = geo.addMapLayer({
       id: nanoid(),
@@ -519,7 +524,7 @@ export function addMapLayer(
       url: "",
       _status: "uninitialized",
       _isNew: true,
-    });
+    })!;
   } else if (layerType === "ImageLayer") {
     newLayer = geo.addMapLayer({
       id: nanoid(),
@@ -529,7 +534,7 @@ export function addMapLayer(
       attributions: "",
       _status: "uninitialized",
       _isNew: true,
-    });
+    })!;
   } else {
     throw new Error(`Unknown layer type ${layerType}`);
   }

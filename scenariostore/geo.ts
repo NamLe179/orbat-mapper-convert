@@ -265,7 +265,7 @@ export function useGeo(store: NewScenarioStore | null) {
       .trigger({ type: "addLayer", id: newLayer.id, data: newLayer })
       .then();
 
-    return state?.layerMap[newLayer.id];
+    return newLayer;
   }
 
   function addMapLayer(data: ScenarioMapLayer) {
@@ -285,7 +285,7 @@ export function useGeo(store: NewScenarioStore | null) {
       { label: "addMapLayer", value: newLayer.id },
     );
     mapLayerEvent.trigger({ type: "add", id: newLayer.id, data: newLayer }).then();
-    return state?.mapLayerMap[newLayer.id];
+    return newLayer;
   }
 
   function moveLayer(layerId: FeatureId, toIndex: number) {

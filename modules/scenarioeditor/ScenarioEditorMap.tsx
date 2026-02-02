@@ -37,12 +37,15 @@ import KeyboardScenarioActions from "./KeyboardScenarioActions";
 import SearchScenarioActions from "./SearchScenarioActions";
 import IconButton from "@/components/IconButton";
 import { Button } from "@/components/ui/button";
+import MainViewSlideOver from "@/components/MainViewSlideOver";
 
 // Types
 import OLMap from "ol/Map";
 import Select from "ol/interaction/Select";
 
-export default function ScenarioEditorMap({ onShowSettings }: { onShowSettings: () => void }) {
+export default function ScenarioEditorMap({ 
+  onShowSettings 
+}: { onShowSettings?: () => void }) {
   const scn = useActiveScenario();
   const ui = useUiStore();
   const playback = usePlaybackStore();
@@ -53,7 +56,17 @@ export default function ScenarioEditorMap({ onShowSettings }: { onShowSettings: 
   // --- Refs & Shallow States ---
   const [mapInstance, setMapInstance] = useState<OLMap | null>(null);
   const [selectInteraction, setSelectInteraction] = useState<Select | null>(null);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const rafRef = useRef<number | null>(null);
+  
+  // Handler for opening settings panel
+  const handleShowSettings = useCallback(() => {
+    if (onShowSettings) {
+      onShowSettings();
+    } else {
+      setShowSettingsPanel(true);
+    }
+  }, [onShowSettings]);
 
   const {
     selectedUnitIds,
@@ -155,7 +168,7 @@ export default function ScenarioEditorMap({ onShowSettings }: { onShowSettings: 
                   <MapTimeController
                     showControls={isMobile ? ui.mobilePanelOpen : false}
                     onOpenTimeModal={openTimeDialog}
-                    onShowSettings={onShowSettings}
+                    onShowSettings={handleShowSettings}
                     onIncDay={() => scn.time.add(1, "day", true)}
                     onDecDay={() => scn.time.subtract(1, "day", true)}
                     onNextEvent={scn.time.goToNextScenarioEvent}
@@ -197,7 +210,7 @@ export default function ScenarioEditorMap({ onShowSettings }: { onShowSettings: 
                 {ui.showOrbatBreadcrumbs && <UnitBreadcrumbs />}
                 <MapEditorMobilePanel
                   onOpenTimeModal={openTimeDialog}
-                  onShowSettings={onShowSettings}
+                  onShowSettings={handleShowSettings}
                   onIncDay={() => scn.time.add(1, "day", true)}
                   onDecDay={() => scn.time.subtract(1, "day", true)}
                   onNextEvent={scn.time.goToNextScenarioEvent}
@@ -211,33 +224,35 @@ export default function ScenarioEditorMap({ onShowSettings }: { onShowSettings: 
             
             {/* Toolbar overlay on map */}
             {ui.showToolbar && (
-              <div className="absolute bottom-0 left-0 right-0 pointer-events-none flex justify-center p-2">
+              <div className="absolute bottom-0 left-0 right-0 pointer-events-none flex flex-col items-center p-2 gap-2">
+                {/* Sub-toolbars - render first so they appear above */}
+                {toolbarStore.currentToolbar === "measurements" && (
+                  <div className="pointer-events-auto">
+                    <MapEditorMeasurementToolbar />
+                  </div>
+                )}
+                {toolbarStore.currentToolbar === "draw" && (
+                  <div className="pointer-events-auto">
+                    <MapEditorDrawToolbar />
+                  </div>
+                )}
+                {toolbarStore.currentToolbar === "track" && (
+                  <div className="pointer-events-auto">
+                    <MapEditorUnitTrackToolbar />
+                  </div>
+                )}
+                
+                {/* Main toolbar */}
                 <div className="pointer-events-auto">
                   <MapEditorMainToolbar
                     onOpenTimeModal={openTimeDialog}
-                    onShowSettings={onShowSettings}
+                    onShowSettings={handleShowSettings}
                     onIncDay={() => scn.time.add(1, "day", true)}
                     onDecDay={() => scn.time.subtract(1, "day", true)}
                     onNextEvent={scn.time.goToNextScenarioEvent}
                     onPrevEvent={scn.time.goToPrevScenarioEvent}
                   />
                 </div>
-                
-                {toolbarStore.currentToolbar === "measurements" && (
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 pointer-events-auto">
-                    <MapEditorMeasurementToolbar />
-                  </div>
-                )}
-                {toolbarStore.currentToolbar === "draw" && (
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 pointer-events-auto">
-                    <MapEditorDrawToolbar />
-                  </div>
-                )}
-                {toolbarStore.currentToolbar === "track" && (
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 pointer-events-auto">
-                    <MapEditorUnitTrackToolbar />
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -257,6 +272,12 @@ export default function ScenarioEditorMap({ onShowSettings }: { onShowSettings: 
           )}
         </div>
       </ActiveFeatureSelectInteractionContext.Provider>
+      
+      {/* Settings Panel Slide-over */}
+      <MainViewSlideOver
+        open={showSettingsPanel}
+        onOpenChange={setShowSettingsPanel}
+      />
     </ActiveMapContext.Provider>
   );
 }

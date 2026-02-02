@@ -99,7 +99,8 @@ export default function LayersPanel() {
     };
 
     const mappedLayers = geoStore.olMap
-      .getAllLayers()
+      .getLayers()  // Only get top-level layers, not getAllLayers()
+      .getArray()
       .filter((l) => l.get("title"))
       .map(transformLayer);
 

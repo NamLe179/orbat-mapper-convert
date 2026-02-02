@@ -33,9 +33,9 @@ export default function ToolbarButton({
         top && "rounded-t-md",
         bottom && "rounded-b-md",
         
-        // Active State Colors
+        // Active State Colors - Xanh lá nhạt
         active
-          ? "bg-army2 text-primary-foreground hover:bg-army2/90"
+          ? "bg-green-100 text-green-900 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-100 dark:hover:bg-green-900/50"
           : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
         
         // Allow overriding classes via props

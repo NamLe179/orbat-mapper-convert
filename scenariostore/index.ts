@@ -91,13 +91,6 @@ export function useScenario() {
     // Don't spread store - it will lose methods and getters
     // Instead, create a proxy or wrapper that adds undo/redo
     const storeWithHistory = store as ScenarioStoreWithHistory;
-    // Add undo/redo methods if they don't exist
-    if (!('undo' in storeWithHistory)) {
-      (storeWithHistory as any).undo = () => console.warn("Undo not implemented");
-      (storeWithHistory as any).redo = () => console.warn("Redo not implemented");
-      (storeWithHistory as any).canUndo = false;
-      (storeWithHistory as any).canRedo = false;
-    }
     
     const timeWithState = {
       ...timeActions,
@@ -119,12 +112,12 @@ export function useScenario() {
     isLoading,
     isReady: !!store && !!store.state,
     setStore, // Exposed for initialization logic
-    store: store, // Return original store, not storeWithHistory
+    store: store, // Return original store
     // Expose helpers cho MainMenu
-    undo: scenario?.store.undo,
-    redo: scenario?.store.redo,
-    canUndo: scenario?.store.canUndo,
-    canRedo: scenario?.store.canRedo,
+    undo: store?.undo,
+    redo: store?.redo,
+    get canUndo() { return store?.canUndo || false; },
+    get canRedo() { return store?.canRedo || false; },
   };
 }
 

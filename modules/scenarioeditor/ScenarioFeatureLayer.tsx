@@ -166,48 +166,38 @@ export default function ScenarioFeatureLayer({
 
   return (
     <ChevronPanel
-      label={layer.name}
-      open={layer._isOpen}
-      onOpenChange={updateLayerOpen}
-      headerClass={cn("-ml-2", isDragging && "opacity-20")}
-      headerRef={elRef as any}
-      data-layer-id={layer.id}
-    >
-      {/* Left Handle */}
-      <template slot="left">
+      label={
+        <>
+          <div
+            onDoubleClick={() => setActiveLayerId(layer.id)}
+            className={cn(
+              "cursor-pointer select-none",
+              layer.isHidden && "opacity-50",
+              layer.id === activeLayerId && "dark:text-army2 text-red-800 font-bold"
+            )}
+          >
+            {layer.name}
+          </div>
+          
+          {itemState.type === "drag-over" && itemState.closestEdge ? (
+            <div className="-m-2">
+              <DropIndicator edge={itemState.closestEdge} gap="0px" />
+            </div>
+          ) : isDragOver ? (
+            <div className="-m-2">
+              <TreeDropIndicator 
+                instruction={{ type: "make-child", currentLevel: 0, indentPerLevel: 0 }} 
+              />
+            </div>
+          ) : null}
+        </>
+      }
+      left={
         <span ref={handleRef}>
           <DragIcon className="text-muted-foreground h-6 w-6 cursor-move group-focus-within:opacity-100 group-hover:opacity-100 sm:opacity-0 transition-opacity" />
         </span>
-      </template>
-
-      {/* Label / Title */}
-      <template slot="label">
-        <div
-          onDoubleClick={() => setActiveLayerId(layer.id)}
-          className={cn(
-            "cursor-pointer select-none",
-            layer.isHidden && "opacity-50",
-            layer.id === activeLayerId && "dark:text-army2 text-red-800 font-bold"
-          )}
-        >
-          {layer.name}
-        </div>
-        
-        {itemState.type === "drag-over" && itemState.closestEdge ? (
-          <div className="-m-2">
-            <DropIndicator edge={itemState.closestEdge} gap="0px" />
-          </div>
-        ) : isDragOver ? (
-          <div className="-m-2">
-            <TreeDropIndicator 
-              instruction={{ type: "make-child", currentLevel: 0, indentPerLevel: 0 }} 
-            />
-          </div>
-        ) : null}
-      </template>
-
-      {/* Right Actions */}
-      <template slot="right">
+      }
+      right={
         <div className="flex items-center space-x-1">
           <Button
             variant="ghost"
@@ -234,12 +224,17 @@ export default function ScenarioFeatureLayer({
           )}
 
           <DotsMenu
-            className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity"
             items={LAYER_MENU_ITEMS}
             onAction={(action) => onLayerAction(layer, action)}
           />
         </div>
-      </template>
+      }
+      open={layer._isOpen}
+      onOpenChange={updateLayerOpen}
+      headerClass={cn("-ml-2", isDragging && "opacity-20")}
+      headerRef={elRef as any}
+      data-layer-id={layer.id}
+    >
 
       {/* Nested Content */}
       <div className="relative">

@@ -9,7 +9,7 @@ import type { Scenario } from "@/types/scenarioModels";
 import { nanoid } from "@/utils/ids";
 
 // Định nghĩa base path cho editor map (Tương đương MAP_EDIT_MODE_ROUTE)
-const MAP_EDITOR_BASE_URL = "/map";
+const MAP_EDITOR_BASE_URL = "/scenario";
 
 export const DEMO_SCENARIOS = [
   {

@@ -70,8 +70,6 @@ export default function LoadScenarioPanel({ onLoaded }: LoadScenarioPanelProps) 
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       readFile(files[0]);
-      // Clear data transfer to prevent browser default behavior
-      e.dataTransfer.clearData();
     }
   }, []);
 

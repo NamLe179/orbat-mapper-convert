@@ -164,15 +164,15 @@ export default function MainMenu({ onAction, onUiAction }: MainMenuProps) {
           <DropdownMenuSubTrigger><span>Edit</span></DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             <DropdownMenuItem 
-              onSelect={() => undo()} 
-              disabled={!canUndo} // React state value
+              onSelect={() => handleAction("undo")} 
+              disabled={!canUndo}
             >
               Undo
               <DropdownMenuShortcut className="ml-4">Ctrl+Z</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuItem 
-              onSelect={() => redo()} 
-              disabled={!canRedo} // React state value
+              onSelect={() => handleAction("redo")} 
+              disabled={!canRedo}
             >
               Redo
               <DropdownMenuShortcut className="ml-4">Ctrl+Shift+Z</DropdownMenuShortcut>

@@ -84,7 +84,9 @@ export type ScenarioFeatureActions =
   | "moveDown"
   | "pan"
   | "duplicate"
-  | "removeMedia";
+  | "removeMedia"
+  | "setActive"
+  | "edit";
 
 export type ScenarioEventAction =
   | "delete"

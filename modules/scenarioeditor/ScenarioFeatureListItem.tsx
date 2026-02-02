@@ -203,12 +203,10 @@ export default function ScenarioFeatureListItem({
         )}
 
         {/* Dots Menu */}
-        <div className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity">
-          <DotsMenu
-            items={featureMenuItems}
-            onAction={onFeatureAction}
-          />
-        </div>
+        <DotsMenu
+          items={featureMenuItems}
+          onAction={onFeatureAction}
+        />
       </div>
 
       {/* Drop Indicator */}

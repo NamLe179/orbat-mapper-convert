@@ -165,8 +165,19 @@ export default function MapEditorMainToolbar(props: MapEditorMainToolbarProps) {
   }, [setActiveSidc, startGetLocation]);
 
   return (
-    <nav className="bg-background border-border pointer-events-auto flex w-full items-center justify-between border p-1 text-sm shadow-sm sm:rounded-xl sm:p-2 md:w-auto">
-      <section className="flex items-center justify-between">
+    <>
+      {/* Placement Instruction Overlay */}
+      {isGetLocationActive && (
+        <FloatingPanel className="bg-background mb-2 overflow-visible p-2 px-4 text-sm mx-auto w-fit flex items-center gap-2">
+          Click on map or ORBAT to place unit.
+          <Button variant="link" size="sm" onClick={() => cancelGetLocation()}>
+            Cancel
+          </Button>
+        </FloatingPanel>
+      )}
+      
+      <nav className="bg-background border-border pointer-events-auto flex w-full items-center justify-between border p-1 text-sm shadow-sm sm:rounded-xl sm:p-2 md:w-auto">
+        <section className="flex items-center justify-between">
         {/* Placement Mode Lock */}
         <MainToolbarButton 
           title="Keep tool active" 
@@ -283,16 +294,7 @@ export default function MapEditorMainToolbar(props: MapEditorMainToolbarProps) {
           <SkipForward className="size-5" />
         </MainToolbarButton>
       </section>
-
-      {/* Placement Instruction Overlay */}
-      {isGetLocationActive && (
-        <FloatingPanel className="bg-opacity-75 absolute bottom-14 overflow-visible p-2 px-4 text-sm sm:bottom-16 sm:left-1/2 sm:-translate-x-1/2">
-          Click on map or ORBAT to place unit.
-          <Button variant="link" size="sm" onClick={() => cancelGetLocation()}>
-            Cancel
-          </Button>
-        </FloatingPanel>
-      )}
-    </nav>
+      </nav>
+    </>
   );
 }

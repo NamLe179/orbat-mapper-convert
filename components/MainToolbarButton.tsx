@@ -20,10 +20,10 @@ export default function MainToolbarButton({
       size="icon"
       className={cn(
         // Logic class dựa trên trạng thái active
-        // Lưu ý: Đổi cú pháp 'class!' (Vue/Windi) thành '!class' (Tailwind chuẩn)
+        // Active: background xanh lá nhạt
         active 
-          ? "bg-army2 hover:!bg-army2/90" 
-          : "hover:!bg-army2/50",
+          ? "bg-green-100 hover:!bg-green-200 dark:bg-green-900/30 dark:hover:!bg-green-900/50" 
+          : "hover:!bg-muted",
         className
       )}
       {...props}

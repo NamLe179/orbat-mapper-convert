@@ -94,11 +94,13 @@ export function getItemsIcon(type: string) {
 
 export const featureMenuItems: MenuItemData<ScenarioFeatureActions>[] = [
   { label: "Zoom to", action: "zoom" },
+  { label: "Set as active", action: "setActive" },
+  { label: "Edit", action: "edit" },
   { label: "Pan to", action: "pan" },
   { label: "Move up", action: "moveUp" },
   { label: "Move down", action: "moveDown" },
-  { label: "Delete", action: "delete" },
   { label: "Duplicate", action: "duplicate" },
+  { label: "Delete", action: "delete" },
 ];
 
 const layersMap = new WeakMap<OLMap, LayerGroup>();
