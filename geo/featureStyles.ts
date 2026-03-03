@@ -85,7 +85,7 @@ export function useFeatureStyles(geo?: TGeo) {
     const geoFeature = activeGeo.getFeatureById(featureId);
     
     // Fallback an toàn nếu feature không tồn tại trong store
-    if (!geoFeature) {
+    if (!geoFeature?.feature) {
       return defaultStyle;
     }
 

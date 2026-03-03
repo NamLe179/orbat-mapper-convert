@@ -424,11 +424,11 @@ export default function ScenarioTimeline() {
 
                 {/* Events Dots */}
                 {eventsWithX.map(({ x, event }: { x: number; event: any }) => (
-                  <button
+                  <div
                     key={event.id}
-                    type="button"
-                    className="absolute h-4 w-4 -translate-x-1/2 rounded-full border border-gray-500 bg-amber-500 hover:bg-red-900"
-                    style={{ left: `${x}px` }}
+                    role="button"
+                    className="absolute h-4 w-4 -translate-x-1/2 cursor-pointer rounded-full border border-orange-600 hover:bg-red-900"
+                    style={{ left: `${x}px`, backgroundColor: '#f59e0b' }}
                     onMouseMove={(e) => e.stopPropagation()}
                     title={event.title}
                     onClick={(e) => {

@@ -109,11 +109,11 @@ export default function ScenarioEventsPanel({
                   <button
                     onClick={() => handleEventClick(event)}
                     className={cn(
-                      "ring-ring mt-1 flex size-4 items-center justify-center rounded-full ring-4 transition-colors",
-                      event.startTime > t && "bg-muted",
-                      event.startTime < t && "bg-background",
-                      event.startTime === t && "bg-accent-foreground"
-                    )}
+                      "z-10 mt-1 flex size-4 items-center justify-center rounded-full ring-2 ring-orange-300 transition-colors bg-orange-400",
+                      event.startTime > t && "!bg-amber-300",
+                      event.startTime < t && "!bg-orange-500",
+                      event.startTime === t && "!bg-orange-600"
+                     )}
                   />
 
                   {/* Event Content */}
