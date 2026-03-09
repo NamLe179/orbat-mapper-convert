@@ -1,3 +1,11 @@
+/**
+ * Chức năng: Các utility functions cho địa lý
+ * - Format ngày theo DTG (Date Time Group) quân sự
+ * - Format tọa độ: DMS, Decimal Degrees, MGRS
+ * - Format độ dài/diện tích theo metric/imperial/nautical
+ * - Chuyển đổi UTC sang Military time zones (Z, A, B,...)
+ */
+
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -10,10 +18,10 @@ import type { Position } from "geojson";
 import { resolveTimeZone } from "@/utils/militaryTimeZones";
 import { useMapSettingsStore } from "@/stores/mapSettingsStore";
 import { formatDecimalDegrees, formatMGRS, type MGRSPrecision } from "@/utils/geoConvert";
-import type { MeasurementUnit } from "@/hooks/geoMeasurement"; // composables -> hooks
-import { type CoordinateFormatType } from "@/hooks/geoShowLocation"; // composables -> hooks
+import type { MeasurementUnit } from "@/hooks/geoMeasurement"; 
+import { type CoordinateFormatType } from "@/hooks/geoShowLocation"; 
 
-// Đảm bảo plugins được load (thường nên làm ở _app hoặc layout, nhưng an toàn thì để đây)
+// Đảm bảo plugins được load cho dayjs trước khi sử dụng
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -45,6 +53,7 @@ export const UTC2MILITARY: Record<string, string> = {
   "12": "M",
 };
 
+// Hàm format DTG theo chuẩn quân sự, với tùy chọn timezone
 export function formatDateString(value?: number, timeZone?: string, template?: string) {
   if (value === undefined || value === null) return "";
   if (timeZone) return dayjs(value).tz(resolveTimeZone(timeZone)).format(template);
@@ -52,6 +61,7 @@ export function formatDateString(value?: number, timeZone?: string, template?: s
   return dayjs.utc(value).format(template);
 }
 
+// Hàm format DTG theo chuẩn quân sự, với timezone mặc định từ map settings
 export function formatDTG(value: number, timeZone: string) {
   if (value === undefined || value === null) return "";
   const date = dayjs(value).tz(resolveTimeZone(timeZone));
@@ -60,14 +70,12 @@ export function formatDTG(value: number, timeZone: string) {
   return date.format(`DDHHmm[${letter}]MMMYY`).toUpperCase();
 }
 
+// Hàm format vị trí (tọa độ) theo định dạng đã chọn trong map settings hoặc theo tùy chọn
 export function formatPosition(
   value?: number[],
   options: { format?: CoordinateFormatType; mgrsPrecision?: MGRSPrecision } = {},
 ) {
   if (value) {
-    // REACT/ZUSTAND CHANGE:
-    // Không thể dùng hook ở top-level. Dùng getState() để lấy giá trị snapshot hiện tại.
-    // Nếu store của bạn là Context API thuần, bạn buộc phải truyền format qua tham số options.
     const currentFormat = useMapSettingsStore.getState().coordinateFormat;
     
     const format = options.format ?? currentFormat;
@@ -80,6 +88,7 @@ export function formatPosition(
   return "";
 }
 
+// Hàm format độ dài theo đơn vị đã chọn (metric, imperial, nautical)
 export function formatLength(length: number, unit: MeasurementUnit = "metric") {
   let output: string = "";
   if (unit === "metric") {
@@ -106,6 +115,7 @@ export function formatLength(length: number, unit: MeasurementUnit = "metric") {
   return output;
 }
 
+// Hàm format diện tích theo đơn vị đã chọn (metric, imperial, nautical)
 export function formatArea(area: number, unit: MeasurementUnit = "metric"): string {
   let output = "";
   if (unit === "metric") {
@@ -132,6 +142,7 @@ export function formatArea(area: number, unit: MeasurementUnit = "metric"): stri
   return output;
 }
 
+// Hàm parse chuỗi tọa độ từ định dạng "latitude,longitude" thành mảng [latitude, longitude]
 export function parseCoordinates(coordinateString: string): [number, number] {
   const parts = coordinateString.split(",").map((s) => s.trim());
 
@@ -150,6 +161,7 @@ export function parseCoordinates(coordinateString: string): [number, number] {
   return [latitude, longitude];
 }
 
+// Hàm cắt bớt độ chính xác của tọa độ để giảm thiểu lỗi làm tròn khi hiển thị hoặc lưu trữ
 export function truncatePosition(
   p: Position,
   options?: { precision?: number },

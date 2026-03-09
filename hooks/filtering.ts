@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Lọc đơn vị trong cây ORBAT dựa trên tên và vị trí.
+ */
+
 import { useMemo } from "react";
 import type { NUnit } from "@/types/internalModels";
 import type { EntityId } from "@/types/base";
@@ -9,8 +13,7 @@ export interface NOrbatItemData {
 
 /**
  * Hàm lọc đơn vị đệ quy (Logic gốc).
- * Lưu ý: Hàm này có "side-effect" là thay đổi thuộc tính `_isOpen` của unit 
- * để tự động mở rộng cây khi tìm kiếm.
+ * Lưu ý: Hàm này có "side-effect" là thay đổi thuộc tính `_isOpen` của unit để tự động mở rộng cây khi tìm kiếm.
  */
 export function filterUnits(
   units: EntityId[],
@@ -34,10 +37,6 @@ export function filterUnits(
 
     // Logic tự động mở node khi search
     if (query && resetOpen) {
-      // Lưu ý: Trong React, việc mutate trực tiếp object state (unit._isOpen) 
-      // đôi khi không trigger re-render nếu không update reference cha.
-      // Tuy nhiên, vì hàm này trả về cấu trúc mảng mới (filteredUnits),
-      // component hiển thị cây thường sẽ nhận prop mới và re-render.
       if (currentUnit._isOpen !== true) {
         currentUnit._isOpen = true; 
       }

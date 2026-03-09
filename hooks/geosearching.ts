@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Tìm kiếm địa điểm (Geocoding) qua Photon/Komoot API
+ */
+
 import { useState, useCallback } from "react";
 import type { Feature, FeatureCollection, Point } from "geojson";
 import type { GeoSearchProperties, PhotonFeatureProperties } from "@/types/search";
@@ -10,6 +14,7 @@ export interface GeoSearchOptions {
 
 export type PhotonSearchResult = Feature<Point, GeoSearchProperties>;
 
+// photonSearch(query) trả về danh sách địa điểm với coordinates
 export function useGeoSearch() {
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<Error | null>(null);

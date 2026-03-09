@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Tạo và quản lý các vòng tròn phạm vi (Range Rings) trên bản đồ.
+ */
+
 import { useEffect, useMemo, useRef, useCallback } from "react";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
@@ -62,13 +66,12 @@ function createRangeRings(unit: NUnit) {
 
 // --- Internal Hook for Styles ---
 
+// Hook để quản lý styles của range rings, với cache và logic group
 function useRangeRingStyles() {
   const styleCache = useRef(new Map<string, Style>());
   const { geo } = useActiveScenario();
   
   // Lấy units trực tiếp từ store thay vì truyền qua args
-  // Lưu ý: geo.everyVisibleUnit có thể là getter hoặc array.
-  // Giả định là array hoặc ta dùng useMemo để access.
   const units = geo.everyVisibleUnit; 
 
   // Refs để giữ data mới nhất cho style function
@@ -113,6 +116,7 @@ function useRangeRingStyles() {
 
 // --- Main Hook ---
 
+// Hook chính để tạo và quản lý layer Range Rings, với logic vẽ và cập nhật khi units thay đổi
 export function useRangeRingsLayer(olMap: OLMap | null) {
   const { geo } = useActiveScenario();
   const units = geo.everyVisibleUnit; // Lấy data từ context
@@ -137,6 +141,7 @@ export function useRangeRingsLayer(olMap: OLMap | null) {
   }, [olMap, layer]);
 
   // 4. Draw Function (Exposed)
+  // Render circles dựa trên rangeRings config của unit
   const drawRangeRings = useCallback(() => {
     const source = layer.getSource();
     if (!source) return;

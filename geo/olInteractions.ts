@@ -2,6 +2,12 @@ import Interaction from "ol/interaction/Interaction";
 import MapBrowserEvent from "ol/MapBrowserEvent";
 import { click } from "ol/events/condition";
 
+/**
+ * Chức năng: Custom interactions cho OpenLayers
+ *    Class MapCtrlClick: xử lý sự kiện Ctrl+Click
+ *    Dùng cho chọn nhiều đối tượng hoặc mở context menu
+ */
+
 // Hàm helper kiểm tra phím Ctrl/Meta (Command trên Mac)
 const ctrlKeyOnly = function (mapBrowserEvent: MapBrowserEvent<any>) {
   const originalEvent = mapBrowserEvent.originalEvent;

@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Hiển thị tọa độ vị trí con trỏ chuột trên bản đồ OpenLayers, với định dạng tùy chọn.
+ */
+
 import { useEffect, useRef } from "react";
 import type OLMap from "ol/Map";
 import MousePosition from "ol/control/MousePosition";
@@ -18,10 +22,7 @@ export interface GeoShowLocationOptions {
 }
 
 /**
- * Hook to add a MousePosition control to an OpenLayers map.
- *
- * @param olMap - The OpenLayers map instance (can be null during initialization)
- * @param options - Configuration options
+ * MousePosition control với format: MGRS, DMS, DD
  */
 export function useShowLocationControl(
   olMap: OLMap | null,
@@ -32,21 +33,20 @@ export function useShowLocationControl(
   const coordinateFormat = options.coordinateFormat ?? "DecimalDegrees";
   const enable = options.enable ?? true;
 
-  // Keep a reference to the control instance to persist across renders
+  // Ref để giữ instance control duy nhất, tránh tạo lại khi options thay đổi
   const controlRef = useRef<MousePosition | null>(null);
 
-  // Initialize the control once
+  // Khởi tạo control một lần duy nhất khi component mount hoặc projection thay đổi
   useEffect(() => {
     if (!controlRef.current) {
       controlRef.current = new MousePosition({
         projection: projection,
         className: "location-control",
-        // We set the placeholder/target behaviors here if needed
       });
     }
   }, [projection]);
 
-  // Effect 1: Handle Map attachment and Enable/Disable state
+  // Effect 1: Bật/Tắt control trên map
   useEffect(() => {
     const control = controlRef.current;
     if (!control || !olMap) return;
@@ -57,13 +57,13 @@ export function useShowLocationControl(
       control.setMap(null);
     }
 
-    // Cleanup: remove control when component unmounts or map changes
+    // Cleanup: đảm bảo control được gỡ bỏ khi component unmount hoặc khi olMap thay đổi
     return () => {
       control.setMap(null);
     };
   }, [olMap, enable]);
 
-  // Effect 2: Handle Coordinate Format changes
+  // Effect 2: Cập nhật định dạng tọa độ khi coordinateFormat thay đổi
   useEffect(() => {
     const control = controlRef.current;
     if (!control) return;
@@ -71,7 +71,6 @@ export function useShowLocationControl(
     const formatFunc: CoordinateFormat = getCoordinateFormatFunction(coordinateFormat);
     control.setCoordinateFormat(formatFunc);
 
-    // Force update visual if needed (porting logic from original Vue code)
     if (enable) {
       // @ts-ignore: accessing private method to force update, mirroring original logic
       if (typeof control.updateHTML_ === "function") {
@@ -79,5 +78,5 @@ export function useShowLocationControl(
         control.updateHTML_([0, 0]);
       }
     }
-  }, [coordinateFormat, enable]); // Dependency on enable ensures we update when toggled on
+  }, [coordinateFormat, enable]);
 }

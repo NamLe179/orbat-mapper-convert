@@ -5,10 +5,15 @@ import XYZ from "ol/source/XYZ";
 import { transformExtent } from "ol/proj";
 import type { LayerConfigFile } from "@/geo/layerConfigTypes";
 
+/**
+ * tạo các lớp bản đồ nền (base layers) từ cấu hình và gán các thuộc tính cần thiết để dễ dàng quản lý sau này.
+ * Hàm createBaseLayerInstances() tạo các TileLayer từ config
+ * Hỗ trợ 2 loại nguồn: OSM (OpenStreetMap) và XYZ (tile server)
+ * Chuyển đổi tọa độ extent sang projection của view
+ */
+
 export function createBaseLayerInstances(layers: LayerConfigFile, view: View) {
   return layers.map((layerConfig) => {
-    // Thay klona() bằng structuredClone() (Native JS)
-    // Giúp deep copy object config để không làm thay đổi object gốc
     const configCopy = structuredClone(layerConfig);
 
     const {
@@ -31,7 +36,6 @@ export function createBaseLayerInstances(layers: LayerConfigFile, view: View) {
     const properties = { title, name, layerType };
 
     let source;
-    // TypeScript check: Ép kiểu nhẹ để khớp với constructor của OL
     if (layerSourceType === "osm") {
       source = new OSM(configCopy.sourceOptions as any);
     } else if (layerSourceType === "xyz") {

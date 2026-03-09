@@ -1,3 +1,11 @@
+/**
+ * Chức năng: Các phép biến đổi hình học GeoJSON (sử dụng Turf.js)
+    * Buffer, Bounding Box, Convex Hull
+    * Simplify, Smooth (polygon/line)
+    * Center, Center of Mass, Centroid
+    * Union, Explode, Bezier spline
+ */
+
 import type {
   Feature,
   FeatureCollection,
@@ -5,7 +13,7 @@ import type {
   MultiPolygon,
   Polygon,
 } from "geojson";
-import type { NScenarioFeature, NUnit } from "@/types/internalModels"; // Removed .ts extension
+import type { NScenarioFeature, NUnit } from "@/types/internalModels"; 
 import {
   feature as turfFeature,
   featureCollection,
@@ -104,6 +112,7 @@ export type TransformationType = TransformationOperation["transform"];
 
 // --- FACTORY FUNCTIONS ---
 
+// Hàm chính để tạo một phép biến đổi mới với ID duy nhất và trạng thái mặc định
 export function createDefaultTransformationOperation(): TransformationOperation {
   return {
     id: nanoid(),
@@ -120,6 +129,7 @@ export function createDefaultTransformationOperation(): TransformationOperation 
 
 // --- TYPE GUARDS ---
 
+// Các type guard để xác định loại hình học của feature
 export function isLineString(
   feature: Feature | FeatureCollection,
 ): feature is Feature<LineString> {
@@ -134,6 +144,7 @@ export function isPolygon(
 
 // --- TRANSFORMATION LOGIC ---
 
+// Hàm thực hiện chuỗi các phép biến đổi trên một feature hoặc feature collection
 export function doScenarioFeatureTransformation(
   features: NScenarioFeature[],
   transformations: TransformationOperation[],
@@ -148,11 +159,13 @@ export function doScenarioFeatureTransformation(
   return doTransformations(geoJSONFeatureOrFeatureCollection, transformations);
 }
 
+// Hàm chuyển đổi một unit thành feature GeoJSON (dùng để làm input cho các phép biến đổi)
 function unitToFeature(unit: NUnit): Feature {
   const location = unit?._state?.location ?? unit.location!;
   return point(location);
 }
 
+// Hàm chính để thực hiện các phép biến đổi trên một hoặc nhiều unit, trả về feature hoặc feature collection đã biến đổi
 export function doUnitTransformations(
   units: NUnit[],
   transformations: TransformationOperation[],
@@ -166,6 +179,7 @@ export function doUnitTransformations(
   return doTransformations(geoJSONFeatureOrFeatureCollection, transformations);
 }
 
+// Hàm thực hiện chuỗi các phép biến đổi trên một feature hoặc feature collection
 function doTransformations(
   geoJSONFeatureOrFeatureCollection: Feature | FeatureCollection,
   transformations: TransformationOperation[],
@@ -176,12 +190,12 @@ function doTransformations(
   }, geoJSONFeatureOrFeatureCollection);
 }
 
+// Hàm thực hiện một phép biến đổi đơn lẻ dựa trên loại transform được chỉ định trong options
 function doSingleTransformation(
   geoJSONFeatureOrFeatureCollection: Feature | FeatureCollection,
   { transform, options }: TransformationOperation,
 ): Feature | FeatureCollection | null | undefined {
   if (transform === "buffer") {
-    // @ts-ignore: TS doesn't strictly distinguish discriminated union in destructuring here perfectly sometimes
     const { radius, steps = 8, units = "kilometers" } = options;
     return turfBuffer(geoJSONFeatureOrFeatureCollection as any, radius, { units, steps });
   }

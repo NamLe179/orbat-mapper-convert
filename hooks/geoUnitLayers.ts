@@ -1,3 +1,8 @@
+/**
+ * Chức năng: Layer hiển thị units và labels trên bản đồ
+ * - Xử lý các loại Interaction: Select, Modify, DragBox interactions
+ */
+
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import OLMap from "ol/Map";
 import View from "ol/View";
@@ -46,7 +51,7 @@ import { coordEach } from "@turf/meta";
 import { centroid } from "@turf/centroid";
 import { klona } from "klona";
 
-// Stores / Contexts (Assumed Hooks)
+// Stores / Contexts
 import { useActiveScenario } from "@/components/injects";
 import { useMapSettingsStore } from "@/stores/mapSettingsStore";
 import { useSymbolSettingsStore } from "@/stores/settingsStore";
@@ -66,7 +71,7 @@ export function calculateZoomToResolution(view: View) {
 // Init once
 calculateZoomToResolution(new View());
 
-// Separate map to track cache keys for units (avoids mutating frozen objects)
+// Cache key map để tránh mutate trực tiếp unit object (vì có thể frozen) khi lưu cache key
 const unitCacheKeyMap = new Map<string, string>();
 
 const unitLabelStyle = new Style({
@@ -91,6 +96,7 @@ const selectedUnitLabelStyle = new Style({
 
 // --- HOOK 1: Manage Unit Layer & Labels ---
 
+// Tạo unit layer với military symbols, quản lý style và label, đồng thời xử lý selection
 export function useUnitLayer(olMap: OLMap | null) {
   const scenario = useActiveScenario(); // Hook thay cho inject
   const {
@@ -130,6 +136,7 @@ export function useUnitLayer(olMap: OLMap | null) {
     ctxRef.current = { scenario, mapSettings, symbolSettings };
   }, [scenario, mapSettings, symbolSettings]);
 
+  // Style function cho mỗi unit layer, sử dụng cache để tối ưu
   const unitStyleFunction = useCallback((feature: FeatureLike, resolution: number) => {
     const { scenario, mapSettings, symbolSettings } = ctxRef.current;
     const unitId = feature.getId() as string;
@@ -145,7 +152,7 @@ export function useUnitLayer(olMap: OLMap | null) {
       return;
     }
 
-    // Use separate cache key map to avoid mutating frozen unit object
+    // Cache logic: Lưu cache key trong map riêng để tránh mutate unit object (có thể frozen)
     const cacheKey = unitCacheKeyMap.get(unitId);
     let unitStyle = cacheKey ? unitStyleCache.get(cacheKey) : undefined;
     if (!unitStyle) {
@@ -157,8 +164,9 @@ export function useUnitLayer(olMap: OLMap | null) {
       unitStyleCache.set(newCacheKey, unitStyle);
     }
     return unitStyle;
-  }, []); // Empty dep, relies on ctxRef
+  }, []); 
 
+  // Style function cho label layer, tương tự cache logic
   const labelStyleFunction = useCallback((feature: FeatureLike, resolution: number) => {
     const { scenario, mapSettings, symbolSettings } = ctxRef.current;
     const unitId = feature.getId() as string;
@@ -214,7 +222,6 @@ export function useUnitLayer(olMap: OLMap | null) {
   }, [mapSettings.mapLabelSize]);
 
   // 4. Undo/Redo Handler (External Subscription)
-  // Giả định onUndoRedo trả về unsubscribe function
   useEffect(() => {
     const unsub = onUndoRedo(() => {
       clearUnitStyleCache();
@@ -225,13 +232,13 @@ export function useUnitLayer(olMap: OLMap | null) {
   }, [onUndoRedo, unitLayer]);
 
   // 5. Draw Logic
+
+  // Render tất cả visible units
   const drawUnits = useCallback(() => {
     const source = unitLayer.getSource();
     if (!source) return;
     
     source.clear();
-    // geo.everyVisibleUnit is a value (getter) or array
-    // Assuming geo.everyVisibleUnit is an array in React context version
     const units = geo.everyVisibleUnit.map((unit) => {
       return createUnitFeatureAt(unit._state!.location!, unit);
     });
@@ -260,6 +267,7 @@ export function useUnitLayer(olMap: OLMap | null) {
 
 // --- HOOK 2: Drag & Drop on Map ---
 
+// Xử lý drag & drop unit hoặc scenario feature lên map, cập nhật vị trí unit hoặc geometry feature tương ứng
 export function useMapDrop(
   olMap: OLMap | null,
   unitLayer: VectorLayer<any>
@@ -348,6 +356,7 @@ export function useMapDrop(
 
 // --- HOOK 3: Move Interaction ---
 
+// Xử lý tương tác di chuyển unit trên map, bao gồm logic kiểm tra lock và cập nhật vị trí sau khi di chuyển
 export function useMoveInteraction(
   olMap: OLMap | null,
   unitLayer: VectorLayer<any>,
@@ -443,6 +452,7 @@ export function useMoveInteraction(
 
 // --- HOOK 4: Unit Select Interaction ---
 
+// Xử lý tương tác chọn unit trên map
 export function useUnitSelectInteraction(
   layers: VectorLayer<any>[],
   olMap: OLMap | null,

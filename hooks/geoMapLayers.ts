@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Cung cấp thông tin hiển thị cho các Map Layer trong scenario, như trạng thái khởi tạo, loại layer
+ */
+
 import type { ScenarioMapLayer, ScenarioMapLayerType } from "@/types/scenarioGeoModels";
 
 export type LayerUpdateOptions = {
@@ -14,7 +18,7 @@ const layerTypeLabelMap: Record<ScenarioMapLayerType, string> = {
 
 /**
  * Hook tính toán thông tin hiển thị cho Map Layer.
- * Trong React, vì logic này rất nhẹ (O(1)), ta tính toán trực tiếp mà không cần useMemo.
+ * Trong React, vì logic này rất nhẹ (O(1)), sẽ tính toán trực tiếp mà không cần useMemo.
  */
 export function useMapLayerInfo(layer: ScenarioMapLayer) {
   // Derived state (tương đương computed trong Vue)

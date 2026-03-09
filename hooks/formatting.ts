@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Định dạng nội dung Markdown thành HTML.
+ */
+
 import MarkdownIt from "markdown-it";
 import MarkdownItContainer from "markdown-it-container";
 import Token from "markdown-it/lib/token.mjs"; // Import type nếu cần thiết
@@ -9,7 +13,6 @@ const md = new MarkdownIt();
 md.use(MarkdownItContainer, "scroll-step");
 
 // Lưu lại renderer mặc định
-// from https://github.com/markdown-it/markdown-it/blob/master/docs/architecture.md#renderer
 const defaultRender =
   md.renderer.rules.link_open ||
   function (tokens, idx, options, env, self) {
@@ -45,8 +48,6 @@ md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
 
 /**
  * Hàm convert Markdown string sang HTML string
- * @param text Nội dung markdown
- * @returns Chuỗi HTML
  */
 export function renderMarkdown(text: string): string {
   return md.render(text);

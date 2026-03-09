@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Cung cấp interaction để xoay, scale ảnh địa lý trên bản đồ.
+ */
+
 import { useEffect, useRef, useState, useCallback } from "react";
 import OLMap from "ol/Map";
 import VectorLayer from "ol/layer/Vector";
@@ -36,6 +40,7 @@ interface InteractionState {
   iHeight: number;
 }
 
+// Quản lý ol-ext Transform interaction cho image overlays
 export function useImageLayerTransformInteraction(
   olMap: OLMap | null,
   options: GeoImageLayerInteractionOptions = {},
@@ -108,7 +113,7 @@ export function useImageLayerTransformInteraction(
     };
 
     const handleInteraction = (e: any) => {
-      const s = stateRef.current; // shorthand
+      const s = stateRef.current; 
       const feature = e.feature;
 
       if (e.type === "rotating") {
@@ -173,7 +178,7 @@ export function useImageLayerTransformInteraction(
     // 5. Cleanup
     return () => {
       olMap.removeInteraction(interaction);
-      olMap.removeLayer(overlayLayer); // Nếu muốn giữ layer thì bỏ dòng này
+      olMap.removeLayer(overlayLayer); 
       interaction.setMap(null);
       
       unByKey(keyStart);

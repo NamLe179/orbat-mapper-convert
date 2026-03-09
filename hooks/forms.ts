@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 
 /**
- * Hook tạo "Buffered Form" pattern.
- * Giữ state nội bộ để chỉnh sửa, và chỉ cập nhật lên cha khi gọi handleSubmit.
- *
- * @param defaultValue Giá trị mặc định nếu không có propValue
- * @param propValue Giá trị từ Parent truyền xuống (tương đương modelValue trong Vue)
- * @param onSave Callback được gọi khi submit (thay cho việc mutate modelValue)
+ * Hook tạo Buffered Form pattern.
+ * Giữ state nội bộ để chỉnh sửa, và chỉ cập nhật lên cha khi submit.
  */
+
+//  Quản lý form state với deep copy, sync từ parent, submit callback
 export function useForm<T>(
   defaultValue: T,
   propValue?: T,

@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Custom React Hook để quản lý state với Immer, hỗ trợ Undo/Redo history.
+ */
+
 import { useState, useRef, useCallback, useMemo } from "react";
 import type { Patch } from "immer";
 import { enablePatches, produceWithPatches, applyPatches, setAutoFreeze } from "immer";
@@ -26,8 +30,7 @@ type UndoRedoEvent<M> = {
 type UndoRedoCallback<M> = (event: UndoRedoEvent<M>) => void;
 
 /**
- * React Hook for Immer-based state management with Undo/Redo history.
- * @param baseState Initial state object
+ * Hook tạo store với Immer, hỗ trợ undo/redo và event subscription.
  */
 export function useImmerStore<T extends object, M>(baseState: T) {
   // --- Refs: Source of Truth (Mutable để xử lý logic đồng bộ) ---

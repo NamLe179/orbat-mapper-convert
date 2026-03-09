@@ -4,8 +4,10 @@ import type { ReadOptions } from "ol/format/Feature";
 import { arrayBufferToString } from "@/importexport/fileHandling";
 
 /**
- * Fetch text content from a blob URL.
- * Note: This only works in the browser environment.
+ * Chức năng: Mở rộng KML format để hỗ trợ KMZ (1 định dạng lưu trữ dữ liệu địa lý trong Google Earth)
+ * Lớp KMLZ extends từ OpenLayers KML
+ * Đọc ArrayBuffer (file binary) và chuyển thành KML text
+ * Hỗ trợ đọc từ Blob URL
  */
 async function getKMLData(objectUrl: string) {
   return fetch(objectUrl).then((response) => response.text());

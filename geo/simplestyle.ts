@@ -12,6 +12,14 @@ import Style from "ol/style/Style";
 import RegularShape from "ol/style/RegularShape";
 import Text from "ol/style/Text";
 
+/**
+ * Chức năng: Triển khai SimpleStyle spec (style được import từ thư viện ol/style)
+ * Tạo Stroke, Fill, Marker styles từ spec (nét vẽ, tô màu, đánh dấu)
+ * Hỗ trợ các marker symbols: square (hình vuông), triangle (tam giác), star (sao), 
+ *    cross (hình chữ thập), circle (tròn), hexagon (lục giác), pentagon (ngũ giác)
+ * Text style với placement, alignment, offset (vị trí, căn chỉnh, độ lệch)
+ */
+
 export interface StrokeStyleSpec {
   stroke: string | null | undefined;
   "stroke-opacity": number;
@@ -174,7 +182,7 @@ export const defaultSimplestyleFill = new Fill({
 });
 
 // Lưu ý: Đảm bảo font 'Inter Variable' đã được load trong layout.tsx của Next.js
-// Nếu dùng next/font/google, bạn cần cấu hình CSS variable.
+// cần cấu hình lại CSS variable nếu dùng next/font/google
 export const defaultSimpleStyleText = new Text({
   font: 'bold 13px "Inter Variable", sans-serif', // Thêm fallback sans-serif
   textAlign: "left",

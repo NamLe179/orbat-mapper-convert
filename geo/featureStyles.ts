@@ -13,6 +13,13 @@ import {
 import type { FeatureId } from "@/types/scenarioGeoModels";
 import type { TGeo } from "@/scenariostore";
 
+/**
+ * Chức năng: Quản lý style cho các features trên bản đồ
+ * Xử lý visibility theo zoom level (minZoom/maxZoom)
+ * Hiển thị/ẩn label text dựa trên resolution
+ * Tích hợp với SimpleStyle spec (mục 8)
+ */
+
 // --- Global State & Initialization ---
 
 let zoomResolutions: number[] = [];
@@ -21,7 +28,6 @@ let zoomResolutions: number[] = [];
 function calculateZoomToResolution(view: View) {
   zoomResolutions = [];
   for (let i = 0; i <= 24; i++) {
-    // getResolutionForZoom có thể trả về undefined, ta ép kiểu hoặc xử lý fallback nếu cần
     const res = view.getResolutionForZoom(i);
     if (res !== undefined) {
       zoomResolutions.push(res);
@@ -49,13 +55,11 @@ const defaultStyle = new Style({
 
 /**
  * Factory function để quản lý style cho OpenLayers features.
- * Trong React Component, bạn nên wrap hàm này trong `useMemo` để giữ styleCache
+ * Trong React Component, nên wrap hàm này trong `useMemo` để giữ styleCache
  * không bị reset mỗi lần re-render.
- *
- * @example
- * const { scenarioFeatureStyle } = useMemo(() => useFeatureStyles(geo), [geo]);
  */
 export function useFeatureStyles(geo?: TGeo) {
+  // useFeatureStyles() tạo style cache
   const context = useActiveScenario();
   const activeGeo = geo || context?.geo;
 

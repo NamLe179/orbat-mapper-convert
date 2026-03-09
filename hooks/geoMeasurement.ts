@@ -1,3 +1,8 @@
+/**
+ * Chức năng: Cung cấp interaction để đo lường khoảng cách và diện tích trên bản đồ.
+ * - Có nhiều formats (metric/imperial/nautical) để hiển thị đơn vị phù hợp
+ */
+
 import { useEffect, useRef } from "react";
 import OLMap from "ol/Map";
 import { Circle as CircleStyle, Fill, RegularShape, Stroke, Style, Text } from "ol/style";
@@ -15,7 +20,6 @@ import type { EventsKey } from "ol/events";
 import { unByKey } from "ol/Observable";
 import { circular } from "ol/geom/Polygon";
 
-// Giả định đường dẫn helper, điều chỉnh nếu cần
 import { getSnappableFeatures } from "./openlayersHelpers"; 
 import { formatArea, formatLength } from "@/geo/utils";
 
@@ -106,7 +110,7 @@ const segmentStyle = new Style({
 });
 
 // --- Logic Wrapper (Pure JS/OL Logic) ---
-// Tách ra khỏi hook để tránh phụ thuộc state React phức tạp bên trong logic OL
+// Tạo Draw interaction với styles đo đạc
 function measurementInteractionWrapper(
   olMap: OLMap,
   initialDrawType: MeasurementTypes,
@@ -251,8 +255,6 @@ function measurementInteractionWrapper(
           if (coords.length < 2) return;
           
           const lastSegment = new LineString(coords.slice(-2));
-          // Note: getLength with projection handles spherical math internally if configured, 
-          // or we handle transform manually as in original code
           const radius = getLength(lastSegment, { projection: "EPSG:4326" });
           
           // Original logic transform check:

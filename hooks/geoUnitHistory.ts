@@ -1,3 +1,8 @@
+/**
+ * Chức năng: Hiển thị và chỉnh sửa lịch sử di chuyển của units
+ * - Hỗ trợ chỉnh sửa các waypoints trên timeline 
+ */
+
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import OLMap from "ol/Map";
 import { Feature, MapBrowserEvent } from "ol";
@@ -22,11 +27,10 @@ import {
 import { MapCtrlClick } from "@/geo/olInteractions";
 import { convertSpeedToMetric } from "@/utils/convert";
 
-// Hooks / Stores replacements
 import { useSelectedItems } from "@/stores/selectedStore";
 import { useSelectedWaypoints } from "@/stores/selectedWaypoints";
 import { useTimeFormatStore } from "@/stores/timeFormatStore";
-import { useActiveScenario } from "@/components/injects"; // Giả định
+import { useActiveScenario } from "@/components/injects"; 
 
 // --- Pure Helper Functions ---
 
@@ -102,6 +106,7 @@ export interface UseUnitHistoryOptions {
   showWaypointTimestamps?: boolean;
 }
 
+// Hook chính để quản lý hiển thị và chỉnh sửa lịch sử di chuyển của units
 export function useUnitHistory(
   olMap: OLMap | null,
   options: UseUnitHistoryOptions = {}
@@ -114,7 +119,7 @@ export function useUnitHistory(
   } = options;
 
   // Context & Stores
-  const { selectedWaypointIds } = useSelectedWaypoints(); // Giả định store expose hàm set
+  const { selectedWaypointIds } = useSelectedWaypoints(); 
   const { selectedUnitIds } = useSelectedItems();
   const { geo, unitActions, store, helpers } = useActiveScenario();
   const fmt = useTimeFormatStore();
@@ -146,7 +151,6 @@ export function useUnitHistory(
     });
 
     // CtrlClick Interaction
-    // Note: Handler sẽ được attach sau để access closure mới nhất hoặc dùng ref
     const ctrlClickInteraction = new MapCtrlClick({ 
       handleCtrlClickEvent: () => {} // Placeholder, sẽ override
     });
@@ -157,7 +161,7 @@ export function useUnitHistory(
 
   const { waypointSelect, historyModify, ctrlClickInteraction } = interactions;
 
-  // 3. Logic: Redraw Selected Layer
+  // 3. Logic: Redraw Selected Layer để Cập nhật waypoint selection
   const redrawSelectedLayer = useCallback((waypointIds: Set<string>) => {
     if (!isInternalRef.current) {
       waypointSelect.getFeatures().clear();
@@ -169,7 +173,7 @@ export function useUnitHistory(
     isInternalRef.current = false;
   }, [waypointSelect, waypointLayer]);
 
-  // 4. Logic: Draw History
+  // 4. Logic: Draw History: Render đường đi từ state history
   const drawHistory = useCallback(() => {
     if (!olMap) return;
 
@@ -340,10 +344,6 @@ export function useUnitHistory(
       evt.selected.forEach((f) => newSet.add(f.getId() as string));
       evt.deselected.forEach((f) => newSet.delete(f.getId() as string));
       
-      // Update Store
-      // Giả định store có hàm replace toàn bộ set hoặc add/delete
-      // setSelectedWaypointIds(newSet); 
-      // Hoặc modify trực tiếp nếu dùng reactive object (như Vue cũ):
       selectedWaypointIds.clear();
       newSet.forEach(id => selectedWaypointIds.add(id));
     });

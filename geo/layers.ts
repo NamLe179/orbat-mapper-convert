@@ -13,6 +13,13 @@ import type { NUnit } from "@/types/internalModels";
 import { LayerTypes } from "@/modules/scenarioeditor/featureLayerUtils";
 
 /**
+ * Chức năng: Tạo và quản lý các vector layer cho units
+ *      createUnitLayer(): tạo layer hiển thị units
+ *      createUnitFeatureAt(): tạo Point feature cho unit
+ *      flyTo(): animation bay đến vị trí trên bản đồ
+ */
+
+/**
  * Creates the main Vector Layer for Units.
  */
 export function createUnitLayer() {

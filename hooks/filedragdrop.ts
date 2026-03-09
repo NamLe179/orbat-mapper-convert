@@ -9,10 +9,10 @@ export interface UseFileDropZoneReturn {
 }
 
 /**
- * Hook to handle file drag and drop on a specific element.
- * * @param targetRef - React ref object pointing to the drop target HTMLElement
- * @param onDropHandler - Callback function when files are dropped
+ * Hook xử lý cho kéo thả file
  */
+
+// Chức năng: Tạo một drop zone cho phép người dùng kéo thả file vào một phần tử DOM cụ thể
 export function useFileDropZone(
   targetRef: RefObject<HTMLElement | null>,
   onDropHandler?: (files: File[] | null) => void,

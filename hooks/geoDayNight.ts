@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Tạo Layer hiển thị đường phân chia ngày và đêm trên bản đồ.
+ */
+
 "use client";
 
 import { useEffect, useMemo } from "react";
@@ -8,13 +12,11 @@ import CircleStyle from "ol/style/Circle";
 import { Fill } from "ol/style";
 import { useStore } from "zustand";
 
-// Giả định bạn đã chuyển MapSettingsStore sang Zustand
 import { useMapSettingsStore } from "@/stores/mapSettingsStore";
 
-// Giả định bạn đã chuyển Scenario Context sang React Context
-// Nếu chưa, bạn cần tạo Context cho Scenario và Hook để lấy nó.
 import { useActiveScenario } from "@/components/injects"; 
 
+// Tạo VectorLayer từ ol-ext/DayNight, cập nhật theo thời gian scenario
 export function useDayNightLayer() {
   // 1. Lấy state từ Context và Store
   const { store } = useActiveScenario();

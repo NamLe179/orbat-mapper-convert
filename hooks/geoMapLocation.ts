@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Chọn vị trí trên bản đồ (sử dụng trong Scenario)
+ */
+
 import { useState, useRef, useCallback, useEffect } from "react";
 import OLMap from "ol/Map";
 import { unByKey } from "ol/Observable";
@@ -6,7 +10,6 @@ import { toLonLat } from "ol/proj";
 import type { EventsKey } from "ol/events";
 import type { Position } from "geojson";
 
-// Giả định bạn đã convert store này sang Zustand
 import { useMapSelectStore } from "@/stores/mapSelectStore";
 
 export interface UseGetMapLocationOptions {
@@ -18,6 +21,7 @@ export interface UseGetMapLocationOptions {
   onStart?: () => void;
 }
 
+// Hook chính để chọn vị trí trên bản đồ, với khả năng cancel bằng click ngoài hoặc phím Esc
 export function useGetMapLocation(
   olMap: OLMap | null, 
   options: UseGetMapLocationOptions = {}

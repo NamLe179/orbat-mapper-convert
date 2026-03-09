@@ -24,6 +24,13 @@ import type { NUnit } from "@/types/internalModels";
 // Constants
 export const VIA_TIME = -1337;
 
+/**
+ * Chức năng: Hiển thị lịch sử di chuyển của units
+ * Tạo các layer group cho: legs (đường đi), waypoints (điểm dừng), labels
+ * Styles cho via points, waypoints, selected waypoints
+ * Xử lý great circle arc cho đường bay xa
+ */
+
 // --- STYLES ---
 
 const viaStyle = new Style({
@@ -97,6 +104,11 @@ export const labelStyle = new Style({
 
 // --- LAYER FACTORY ---
 
+/**
+ * Hàm createUnitHistoryLayers() tạo layer group lịch sử di chuyển của unit, bao gồm legs, waypoints, via points, và labels. 
+ * Các layer này được tổ chức trong một LayerGroup để dễ dàng quản lý và hiển thị trên bản đồ. 
+ * Mỗi layer có style riêng biệt để phân biệt các loại thông tin khác nhau (đường đi, điểm dừng, v.v.).
+ */
 export function createUnitHistoryLayers() {
   const legLayer = new VectorLayer({
     source: new VectorSource({}),

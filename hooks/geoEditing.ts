@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Cung cấp các interaction để vẽ, chỉnh sửa, dịch chuyển các đối tượng địa lý trên bản đồ.
+ */
+
 import { useEffect, useRef, useState, useCallback } from "react";
 import OLMap from "ol/Map";
 import type VectorLayer from "ol/layer/Vector";
@@ -42,6 +46,7 @@ interface InteractionsBundle {
   featureCollection: Collection<Feature<Geometry>>;
 }
 
+// Hook chính để quản lý interactions trên thanh toolbar
 export function useEditingInteraction(
   olMap: OLMap | null,
   vectorLayer: VectorLayer<any> | null,
@@ -161,8 +166,6 @@ export function useEditingInteraction(
 
       [lineDraw, polygonDraw, pointDraw, circleDraw, modify, translate].forEach(i => {
         olMap.removeInteraction(i);
-        // Unlisten handled automatically by OL when removed usually, but good practice to allow GC
-        // Nếu cần unlisten thủ công: i.un('event', handler);
       });
 
       if (!optionsRef.current.select) {
@@ -173,9 +176,7 @@ export function useEditingInteraction(
       }
       interactionsRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [olMap, vectorLayer]); 
-  // dependencies limit to map/layer changes. options are ref-ed.
 
 
   // -- 2. Snap Interaction Handling --

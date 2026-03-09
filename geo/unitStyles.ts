@@ -1,3 +1,10 @@
+/**
+ * Chức năng: Tạo styles cho military symbols (theo chuẩn NATO)
+ * Sử dụng milsymbol để render SIDC codes
+ * Cache styles để tối ưu performance
+ * Hỗ trợ custom symbols và text amplifiers
+ */
+
 import { Icon, Style } from "ol/style";
 import type { CustomSymbol, UnitSymbolOptions } from "@/types/scenarioModels";
 import { symbolGenerator } from "@/symbology/milsymbwrapper";
@@ -17,6 +24,7 @@ export const unitStyleCache = new Map<string, Style>();
 export const selectedUnitStyleCache = new Map<string, Style>();
 export const labelStyleCache = new Map<string, UnitLabelData>();
 
+// Hàm xóa cache khi có thay đổi về symbol hoặc map settings
 export function clearUnitStyleCache() {
   unitStyleCache.clear();
   selectedUnitStyleCache.clear();
@@ -29,6 +37,7 @@ export function invalidateUnitStyle(cacheKey: string) {
   labelStyleCache.delete(cacheKey);
 }
 
+// Hàm tạo style cho unit dựa trên SIDC và các tùy chọn
 function createMilSymbolStyle(milSymbol: MilSymbol) {
   const { x, y } = milSymbol.getAnchor();
   const image = new Icon({
@@ -43,6 +52,7 @@ function createMilSymbolStyle(milSymbol: MilSymbol) {
   });
 }
 
+// Hàm tạo style cho custom symbol
 function createCustomSymbolStyle(
   customSymbol: CustomSymbol,
   size: number,
@@ -60,6 +70,7 @@ function createCustomSymbolStyle(
   });
 }
 
+// Hàm chính để tạo style cho unit, sử dụng cache nếu có
 export function createUnitStyle(
   unit: NUnit,
   symbolOptions: UnitSymbolOptions,
@@ -110,6 +121,8 @@ type UnitLabelOptions = {
   wrapLabels?: boolean;
   wrapWidth?: number;
 };
+
+// Hàm tạo label data cho unit, sử dụng cache nếu có
 export function createUnitLabelData(
   unit: NUnit,
   unitStyle: Style | undefined,

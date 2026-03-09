@@ -1,8 +1,7 @@
 /**
- * Types for layer configuration loaded from the mapConfig.json file.
- *
- * ORBAT Mapper uses OpenLayers for its mapping functionality and most of the layer configuration
- * is passed directly to OpenLayers.
+ * Chức năng: TypeScript types cho cấu hình layer
+ * LayerConfig: hợp nhất loại cho XYZ và OSM layers
+ * Định nghĩa options cho tile layer và source
  */
 import type { Options as XYZOptions } from "ol/source/XYZ";
 import type { Options as OSMOptions } from "ol/source/OSM";

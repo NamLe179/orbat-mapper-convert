@@ -1,3 +1,7 @@
+/**
+ * Chức năng: Hiển thị Scale Line (thước đo tỷ lệ) trên bản đồ OpenLayers.
+ */
+
 import { useEffect, useMemo } from "react";
 import OLMap from "ol/Map";
 import { ScaleLine } from "ol/control";
@@ -10,6 +14,7 @@ export interface GeoShowScaleLineOptions {
   measurementUnits?: MeasurementUnit;
 }
 
+// Hook chính để quản lý Scale Line control trên bản đồ, với khả năng bật/tắt và thay đổi đơn vị đo
 export function useShowScaleLine(
   olMap: OLMap | null,
   options: GeoShowScaleLineOptions = {}
@@ -24,11 +29,8 @@ export function useShowScaleLine(
   const scaleLineControl = useMemo(() => {
     return new ScaleLine({ 
       units: measurementUnits,
-      // Có thể thêm className custom nếu dùng Tailwind
-      // className: 'ol-scale-line custom-scale-line' 
     });
-    // Lưu ý: Ta không đưa measurementUnits vào dependencies ở đây 
-    // vì ta muốn update nó qua method setUnits thay vì tạo instance mới.
+    // Lưu ý: không đưa measurementUnits vào dependencies ở đây vì muốn update nó qua method setUnits thay vì tạo instance mới.
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 2. Effect: Xử lý Bật/Tắt Control trên Map

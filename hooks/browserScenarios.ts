@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Chức năng: Quản lý scenarios lưu trữ trong IndexedDB của trình duyệt
+ */
+
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { type ScenarioMetadata, getIndexedDb } from "@/scenariostore/localdb";
@@ -30,12 +34,13 @@ export const DEMO_SCENARIOS = [
   },
 ];
 
+// Hook chính quản lý danh sách scenarios lưu trữ trong trình duyệt, cung cấp các chức năng load, delete, duplicate, download và sort scenarios
 export function useBrowserScenarios() {
   const router = useRouter();
   const [storedScenarios, setStoredScenarios] = useState<ScenarioMetadata[]>([]);
   const [activeSort, setActiveSort] = useState("lastModified");
 
-  // Hàm helper để load lại danh sách
+  // Hàm helper để load lại danh sách từ IndexDB
   const reloadScenarios = useCallback(async () => {
     const { listScenarios } = await getIndexedDb();
     const scenarios = await listScenarios();
@@ -84,6 +89,7 @@ export function useBrowserScenarios() {
     },
   ], [activeSort]);
 
+  // Hàm xử lý các action (open, delete, download, duplicate) khi user tương tác với scenario trong list
   async function onAction(action: StoredScenarioAction, scenario: ScenarioMetadata) {
     const { deleteScenario, duplicateScenario, downloadAsJson } =
       await getIndexedDb();
@@ -112,6 +118,7 @@ export function useBrowserScenarios() {
     await reloadScenarios();
   }
 
+  // Import scenario mới vào DB và điều hướng đến trang editor của scenario đó
   async function loadScenario(v: Scenario) {
     const { addScenario, getScenarioInfo, putScenario } = await getIndexedDb();
 
@@ -139,6 +146,7 @@ export function useBrowserScenarios() {
     router.push(`${MAP_EDITOR_BASE_URL}/${scenarioId}`);
   }
 
+  // Lấy scenario từ DB theo ID
   async function importScenario(scenarioId: string) {
     const { loadScenario: dbLoadScenario } = await getIndexedDb();
     const scenario = await dbLoadScenario(scenarioId);
