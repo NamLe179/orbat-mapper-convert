@@ -160,7 +160,7 @@ export default function MainMenu({ onAction, onUiAction }: MainMenuProps) {
         </DropdownMenuSub>
 
         {/* EDIT SUBMENU */}
-        <DropdownMenuSub>
+        {/* <DropdownMenuSub>
           <DropdownMenuSubTrigger><span>Edit</span></DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             <DropdownMenuItem 
@@ -178,7 +178,7 @@ export default function MainMenu({ onAction, onUiAction }: MainMenuProps) {
               <DropdownMenuShortcut className="ml-4">Ctrl+Shift+Z</DropdownMenuShortcut>
             </DropdownMenuItem>
           </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        </DropdownMenuSub> */}
 
         {/* VIEW SUBMENU */}
         <DropdownMenuSub>

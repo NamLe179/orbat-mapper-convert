@@ -267,12 +267,12 @@ export default function MapEditorMainToolbar(props: MapEditorMainToolbarProps) {
       <section className="flex items-center">
         <div className="border-border -mx-1 h-7 border-l-2 sm:mx-1" />
         
-        <MainToolbarButton title="Undo" onClick={() => scnStore.undo()} disabled={!scnStore.canUndo}>
+        {/* <MainToolbarButton title="Undo" onClick={() => scnStore.undo()} disabled={!scnStore.canUndo}>
           <RotateCcw className="size-6" />
         </MainToolbarButton>
         <MainToolbarButton title="Redo" onClick={() => scnStore.redo()} disabled={!scnStore.canRedo}>
           <RotateCw className="size-6" />
-        </MainToolbarButton>
+        </MainToolbarButton> */}
 
         <div className="border-border mx-1 hidden h-7 border-l-2 sm:block" />
 

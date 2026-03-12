@@ -117,12 +117,12 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
   // --- Handlers ---
   const onScenarioAction = async (action: string) => {
     switch (action) {
-      case "undo":
-        undo();
-        break;
-      case "redo":
-        redo();
-        break;
+      // case "undo":
+      //   undo();
+      //   break;
+      // case "redo":
+      //   redo();
+      //   break;
       case "save":
         // Save scenario to JSON file via API
         const newId = await scn.io.saveToIndexedDb();
@@ -205,9 +205,9 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
       e.preventDefault();
       uiStore.setShowSearch(true);
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-      e.shiftKey ? redo() : undo();
-    }
+    // if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+    //   e.shiftKey ? redo() : undo();
+    // }
   });
 
   return (
@@ -249,7 +249,7 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
           </div>
 
           {/* History Controls */}
-          <div className="flex items-center border-l pl-2">
+          {/* <div className="flex items-center border-l pl-2">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -270,7 +270,7 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
             >
               <Redo2 className="size-5" />
             </Button>
-          </div>
+          </div> */}
 
           <Button variant="ghost" size="icon" onClick={() => setIsSlideOverOpen(true)}>
             <MenuIcon className="size-6" />
