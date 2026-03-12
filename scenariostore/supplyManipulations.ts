@@ -1,5 +1,76 @@
+/**
+ * Supply Manipulations
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE CHỈ gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/supplyClasses        - Create supply class 
+ * - PUT    /api/scenarios/:scenarioId/supplyClasses/:id    - Update supply class
+ * - DELETE /api/scenarios/:scenarioId/supplyClasses/:id    - Delete supply class
+ * 
+ * - POST   /api/scenarios/:scenarioId/supplyCategories     - Create supply category 
+ * - PUT    /api/scenarios/:scenarioId/supplyCategories/:id - Update supply category
+ * - DELETE /api/scenarios/:scenarioId/supplyCategories/:id - Delete supply category
+ * 
+ * - POST   /api/scenarios/:scenarioId/supplyUoms           - Create supply UoM 
+ * - PUT    /api/scenarios/:scenarioId/supplyUoms/:id       - Update supply UoM
+ * - DELETE /api/scenarios/:scenarioId/supplyUoms/:id       - Delete supply UoM
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/supplies - Update unit supplies
+ */
+
 import { nanoid } from "@/utils";
 import { klona } from "klona";
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiCreateSupplyClass(scenarioId: string, supplyClass: NSupplyClass): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/supplyClasses`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(supplyClass),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateSupplyClass(scenarioId: string, id: string, data: SupplyClassUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/supplyClasses/${id}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteSupplyClass(scenarioId: string, id: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/supplyClasses/${id}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreateSupplyCategory(scenarioId: string, category: NSupplyCategory): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/supplyCategories`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(category),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateSupplyCategory(scenarioId: string, id: string, data: SupplyCategoryUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/supplyCategories/${id}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteSupplyCategory(scenarioId: string, id: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/supplyCategories/${id}`, {
+//     method: 'DELETE',
+//   });
+// }
 
 // Project imports
 import type { NewScenarioStore, ScenarioState } from "@/scenariostore/newScenarioStore";

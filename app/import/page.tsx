@@ -13,7 +13,9 @@ import {
   Sun,
 } from "lucide-react";
 import { useScenarioShare } from "@/hooks/scenarioShare";
-import { getIndexedDb } from "@/scenariostore/localdb";
+// DEPRECATED: IndexedDB is no longer used for scenario storage
+// import { getIndexedDb } from "@/scenariostore/localdb";
+import { mockScenarioService } from "@/scenariostore/mockScenarios";
 import { nanoid } from "@/utils";
 import type { EncryptedScenario, Scenario, Unit } from "@/types/scenarioModels";
 import DecryptScenarioModal from "@/components/DecryptScenarioModal";
@@ -105,8 +107,7 @@ export default function ImportScenarioPage() {
 
     // Check if scenario with same ID exists
     if (scenario?.id) {
-      const db = await getIndexedDb();
-      const existingScenario = await db.getScenarioInfo(scenario.id);
+      const existingScenario = await mockScenarioService.getScenarioInfo(scenario.id);
       if (existingScenario) {
         setHasConflict(true);
         return;
@@ -118,7 +119,6 @@ export default function ImportScenarioPage() {
   }
 
   async function saveAndNavigate(scenario: Scenario) {
-    const db = await getIndexedDb();
     const newId = nanoid();
 
     const newScenario = {
@@ -127,15 +127,15 @@ export default function ImportScenarioPage() {
     };
 
     console.log("[ImportPage] Saving scenario with ID:", newId);
-    await db.putScenario(newScenario);
+    await mockScenarioService.saveScenario(newScenario);
     
     // Verify scenario was saved
-    const saved = await db.getScenarioInfo(newId);
+    const saved = await mockScenarioService.getScenarioInfo(newId);
     console.log("[ImportPage] Scenario saved successfully:", saved ? "yes" : "no");
     
     if (!saved) {
-      console.error("[ImportPage] Failed to save scenario to IndexedDB");
-      setError("Failed to save scenario to browser storage.");
+      console.error("[ImportPage] Failed to save scenario to storage");
+      setError("Failed to save scenario to storage.");
       return;
     }
     
@@ -145,8 +145,7 @@ export default function ImportScenarioPage() {
 
   async function handleReplaceExisting() {
     if (!scenarioData) return;
-    const db = await getIndexedDb();
-    await db.putScenario(scenarioData);
+    await mockScenarioService.saveScenario(scenarioData);
     router.push(`/scenario/${scenarioData.id}`);
   }
 

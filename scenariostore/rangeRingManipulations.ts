@@ -1,5 +1,69 @@
+/**
+ * Range Ring Manipulations
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE CHỈ gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/units/:unitId/rangeRings       - Add range ring 
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/rangeRings/:idx  - Update range ring
+ * - DELETE /api/scenarios/:scenarioId/units/:unitId/rangeRings/:idx  - Delete range ring
+ * 
+ * - POST   /api/scenarios/:scenarioId/rangeRingGroups                - Create group 
+ * - PUT    /api/scenarios/:scenarioId/rangeRingGroups/:id            - Update group
+ * - DELETE /api/scenarios/:scenarioId/rangeRingGroups/:id            - Delete group
+ */
+
 import { klona } from "klona";
 import { nanoid } from "@/utils";
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiAddRangeRing(scenarioId: string, unitId: string, rangeRing: RangeRing): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/rangeRings`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(rangeRing),
+//   });
+// }
+
+// async function apiUpdateRangeRing(scenarioId: string, unitId: string, index: number, data: Partial<RangeRing>): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/rangeRings/${index}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteRangeRing(scenarioId: string, unitId: string, index: number): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/rangeRings/${index}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreateRangeRingGroup(scenarioId: string, group: RangeRingGroup): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/rangeRingGroups`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(group),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateRangeRingGroup(scenarioId: string, groupId: string, data: Partial<RangeRingGroup>): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/rangeRingGroups/${groupId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteRangeRingGroup(scenarioId: string, groupId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/rangeRingGroups/${groupId}`, {
+//     method: 'DELETE',
+//   });
+// }
 
 // Project imports
 import type { EntityId } from "@/types/base";

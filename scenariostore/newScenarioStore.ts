@@ -1,3 +1,22 @@
+/**
+ * Scenario Store (Zustand + Immer)
+ * 
+ * Đây là store chính quản lý state của scenario.
+ * Tất cả thao tác trên scenario đều đi qua store này.
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * Flow dự kiến:
+ * - Load:   BE API -> prepareScenario() -> ScenarioState (local)
+ * - Save:   ScenarioState -> serializeScenario() -> BE API
+ * - Create: FE gửi data -> BE tạo và lưu vào DB -> trả về entity -> cập nhật local state
+ * 
+ * Xem scenarioApi.ts để biết các API endpoints.
+ * Xem các file *Manipulations.ts để biết các API cho từng entity.
+ */
+
 import { createStore } from "zustand/vanilla";
 import { immer } from "zustand/middleware/immer";
 import { subscribeWithSelector } from "zustand/middleware";

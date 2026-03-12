@@ -124,6 +124,7 @@ export default function ScenarioEditor({ children }: { children: React.ReactNode
         redo();
         break;
       case "save":
+        // Save scenario to JSON file via API
         const newId = await scn.io.saveToIndexedDb();
         send({ message: "Scenario saved" });
         if (state.id !== newId) router.push(`/${MAP_EDIT_MODE_ROUTE}/${newId}`);

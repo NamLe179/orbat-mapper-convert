@@ -1,5 +1,74 @@
+/**
+ * TOE (Table of Organization and Equipment) Manipulations
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE CHỈ gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/equipment              - Create equipment 
+ * - PUT    /api/scenarios/:scenarioId/equipment/:id          - Update equipment
+ * - DELETE /api/scenarios/:scenarioId/equipment/:id          - Delete equipment
+ * 
+ * - POST   /api/scenarios/:scenarioId/personnel              - Create personnel 
+ * - PUT    /api/scenarios/:scenarioId/personnel/:id          - Update personnel
+ * - DELETE /api/scenarios/:scenarioId/personnel/:id          - Delete personnel
+ * 
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/equipment - Update unit equipment assignment
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/personnel - Update unit personnel assignment
+ */
+
 import { nanoid } from "@/utils";
 import { klona } from "klona";
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiCreateEquipment(scenarioId: string, equipment: NEquipmentData): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/equipment`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(equipment),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateEquipment(scenarioId: string, id: string, data: EquipmentDataUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/equipment/${id}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteEquipment(scenarioId: string, id: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/equipment/${id}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreatePersonnel(scenarioId: string, personnel: NPersonnelData): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/personnel`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(personnel),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdatePersonnel(scenarioId: string, id: string, data: PersonnelDataUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/personnel/${id}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeletePersonnel(scenarioId: string, id: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/personnel/${id}`, {
+//     method: 'DELETE',
+//   });
+// }
 
 // Project imports
 import type { NewScenarioStore } from "@/scenariostore/newScenarioStore";

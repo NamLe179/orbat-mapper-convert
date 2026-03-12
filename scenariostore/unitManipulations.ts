@@ -35,6 +35,135 @@ import { useRangeRingManipulations } from "@/scenariostore/rangeRingManipulation
 import { useUnitStateManipulations } from "@/scenariostore/unitStateManipulations";
 import { CUSTOM_SYMBOL_PREFIX } from "@/config/constants"; // Removed .ts
 
+/**
+ * API Integration - Unit/Side/SideGroup CRUD
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE CHỈ gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * Ví dụ flow tạo Unit:
+ * 1. FE gọi: POST /api/scenarios/:scenarioId/units với body { name, sidc, parentId, ... }
+ * 2. BE tạo unit, sinh ID, lưu DB, trả về { id, name, sidc, ... }
+ * 3. FE nhận response, cập nhật store.unitMap[id] = response.data
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/units                    - Create unit 
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId            - Update unit
+ * - DELETE /api/scenarios/:scenarioId/units/:unitId            - Delete unit
+ * 
+ * - POST   /api/scenarios/:scenarioId/sides                    - Create side 
+ * - PUT    /api/scenarios/:scenarioId/sides/:sideId            - Update side
+ * - DELETE /api/scenarios/:scenarioId/sides/:sideId            - Delete side
+ * 
+ * - POST   /api/scenarios/:scenarioId/sideGroups               - Create side group 
+ * - PUT    /api/scenarios/:scenarioId/sideGroups/:groupId      - Update side group
+ * - DELETE /api/scenarios/:scenarioId/sideGroups/:groupId      - Delete side group
+ * 
+ * - POST   /api/scenarios/:scenarioId/units/:unitId/clone      - Clone unit 
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/move       - Move unit to new parent
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/reorder    - Reorder unit within parent
+ */
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiCreateUnit(scenarioId: string, unit: NUnit, parentId: EntityId): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/units`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ unit, parentId }),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateUnit(scenarioId: string, unitId: string, data: UnitUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteUnit(scenarioId: string, unitId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreateSide(scenarioId: string, side: NSide): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/sides`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(side),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateSide(scenarioId: string, sideId: string, data: SideUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/sides/${sideId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteSide(scenarioId: string, sideId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/sides/${sideId}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreateSideGroup(scenarioId: string, sideId: string, group: NSideGroup): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/sideGroups`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ ...group, sideId }),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateSideGroup(scenarioId: string, groupId: string, data: SideGroupUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/sideGroups/${groupId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteSideGroup(scenarioId: string, groupId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/sideGroups/${groupId}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCloneUnit(scenarioId: string, unitId: string, options: CloneUnitOptions): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/clone`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(options),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiMoveUnit(scenarioId: string, unitId: string, newParentId: EntityId): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/move`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ newParentId }),
+//   });
+// }
+
+// async function apiReorderUnit(scenarioId: string, unitId: string, targetId: EntityId, position: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/reorder`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ targetId, position }),
+//   });
+// }
+
 export type NWalkSubUnitCallback = (unit: NUnit) => void;
 
 export type NWalkSideCallback = (
@@ -379,6 +508,15 @@ export function useUnitManipulations(store: NewScenarioStore) {
       });
     }
     if (doUpdateUnitState) updateUnitState(unitId);
+
+    // TODO: API Integration - Update unit on backend
+    // await apiUpdateUnit(store.state.id, unitId, data);
+    // OR:
+    // await fetch(`/api/scenarios/${store.state.id}/units/${unitId}`, {
+    //   method: 'PUT',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify(data),
+    // });
   }
 
   function batchUpdateUnit(
@@ -481,6 +619,17 @@ export function useUnitManipulations(store: NewScenarioStore) {
         }
       }
     });
+
+    // TODO: API Integration - Delete unit(s) on backend
+    // for (const unitId of unitIds) {
+    //   await apiDeleteUnit(store.state.id, unitId);
+    // }
+    // OR batch delete:
+    // await fetch(`/api/scenarios/${store.state.id}/units/batch-delete`, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ unitIds }),
+    // });
   }
 
   function changeUnitParent(
@@ -745,6 +894,15 @@ export function useUnitManipulations(store: NewScenarioStore) {
       });
     }
     if (updateState) updateUnitState(unit.id);
+
+    // TODO: API Integration - Create unit on backend
+    // await apiCreateUnit(store.state.id, unit, parentId);
+    // OR: 
+    // await fetch(`/api/scenarios/${store.state.id}/units`, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ unit, parentId, index }),
+    // });
 
     return unit.id;
   }

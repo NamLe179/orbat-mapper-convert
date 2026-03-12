@@ -1,3 +1,13 @@
+/**
+ * File này sẽ bị XÓA 1 phần hoặc toàn bộ khi ghép với Backend do ScenarioMetadata được sử dụng ở nhiều file khác
+ * 
+ * Khi ghép BE:
+ * - Di chuyển type ScenarioMetadata sang file types riêng nếu cần
+ * - Thay thế tất cả import getIndexedDb bằng scenarioApi
+ * 
+ * có thể giữ lại type ScenarioMetadata trong file types/scenarioModels.ts
+ */
+
 import type { DBSchema, IDBPDatabase } from "idb";
 import { openDB } from "idb";
 import type { Scenario } from "@/types/scenarioModels";

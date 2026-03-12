@@ -1,3 +1,23 @@
+/**
+ * Scenario I/O (Input/Output) Operations
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * Xem scenarioApi.ts để biết chi tiết implementation các API endpoints.
+ * 
+ * Export (có thể giữ phía client hoặc chuyển lên BE):
+ * - POST   /api/scenarios/:id/export/json    - Export as JSON
+ * - POST   /api/scenarios/:id/export/geojson - Export as GeoJSON
+ * - POST   /api/scenarios/:id/export/kml     - Export as KML/KMZ
+ * - POST   /api/scenarios/:id/export/xlsx    - Export as XLSX
+ * 
+ * Khi ghép BE:
+ * - Xóa folder /app/api/ và mockScenarios.ts
+ * - Thay mockScenarioService bằng scenarioApi
+ */
+
 import dayjs from "dayjs";
 import { klona } from "klona";
 import { nanoid } from "@/utils";
@@ -47,7 +67,9 @@ import {
 } from "./newScenarioStore";
 import { useSymbolSettingsStore } from "@/stores/settingsStore"; // Assuming converted to Zustand/Hook
 import { useSetLoading } from "@/scenariostore/index"; // Converted to Zustand in previous step
-import { getIndexedDb } from "@/scenariostore/localdb"; // Assuming async utility
+// DEPRECATED: IndexedDB is no longer used for scenario storage
+// import { getIndexedDb } from "@/scenariostore/localdb";
+import { mockScenarioService } from "@/scenariostore/mockScenarios";
 
 export interface CreateEmptyScenarioOptions {
   id?: string;
@@ -409,21 +431,29 @@ export function useScenarioIO({ store, setStore }: ScenarioIOContext) {
   }
 
   async function saveToIndexedDb() {
-    const { putScenario } = await getIndexedDb();
+    // Saves scenario to JSON file via API
     const scn = serializeToObject();
     if (scn.id.startsWith("demo-")) {
       scn.id = nanoid();
       if (store) store.state.id = scn.id;
     }
-    return await putScenario(scn);
+    
+    // Save scenario via API (creates/updates JSON file in public/scenarios)
+    const savedId = await mockScenarioService.saveScenario(scn);
+    console.log("[io.ts] Scenario saved to file:", savedId);
+    
+    return savedId;
   }
 
   async function duplicateScenario() {
-    const { putScenario } = await getIndexedDb();
     const scn = serializeToObject();
     scn.id = nanoid();
     scn.name = `${scn.name} (copy)`;
-    await putScenario(scn);
+    
+    // Save duplicated scenario via API
+    await mockScenarioService.saveScenario(scn);
+    console.log("[io.ts] Scenario duplicated:", scn.id);
+    
     return scn.id;
   }
 
@@ -464,21 +494,19 @@ export function useScenarioIO({ store, setStore }: ScenarioIOContext) {
     loadFromObject(scn);
   }
 
-  async function loadDemoScenario(id: string | "falkland82" | "narvik40") {
+  async function loadDemoScenario(id: string | "falkland82" | "narvik40" | "empty") {
     setLoading(true);
-    const idUrlMap: Record<string, string> = {
-      falkland82: "/scenarios/falkland82.json",
-      narvik40: "/scenarios/narvik40.json",
-    };
-    const url = idUrlMap[id];
-    if (!url) {
+    
+    // Use mock scenario service to load demo scenarios
+    const scenarioData = await mockScenarioService.loadScenario(id);
+    
+    if (!scenarioData) {
       console.warn("Unknown scenario id", id);
       setLoading(false);
       return;
     }
-    await loadFromUrl(url);
-    // isLoading is handled inside loadFromUrl's finally block, 
-    // but redundant set here just in case of logic flow changes
+    
+    loadFromObject(scenarioData);
     setLoading(false);
   }
 

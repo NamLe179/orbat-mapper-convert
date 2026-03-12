@@ -1,8 +1,22 @@
+/**
+ * Browser Scenarios Hook
+ * 
+ * This hook provides scenario management operations for UI components.
+ * It handles listing, loading, creating, duplicating, and deleting scenarios.
+ * 
+ * IMPORTANT: API Integration Notes
+ * 
+ * Currently using mockScenarioService which stores data as JSON files.
+ */
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { type ScenarioMetadata, getIndexedDb } from "@/scenariostore/localdb";
+// DEPRECATED: IndexedDB is no longer used for scenario storage
+// import { type ScenarioMetadata, getIndexedDb } from "@/scenariostore/localdb";
+import type { ScenarioMetadata } from "@/scenariostore/localdb";
+import { mockScenarioService, isDemoScenario, DEMO_SCENARIO_IDS } from "@/scenariostore/mockScenarios";
 import type { MenuItemData } from "@/components/types"; // Kiểm tra lại đường dẫn này trong project của bạn
 import type { StoredScenarioAction } from "@/types/constants";
 import type { Scenario } from "@/types/scenarioModels";
@@ -11,6 +25,8 @@ import { nanoid } from "@/utils/ids";
 // Định nghĩa base path cho editor map (Tương đương MAP_EDIT_MODE_ROUTE)
 const MAP_EDITOR_BASE_URL = "/scenario";
 
+// Demo scenarios are now defined in mockScenarios.ts
+// These are kept for backward compatibility with UI components
 export const DEMO_SCENARIOS = [
   {
     name: "The Falklands War 1982",
@@ -28,6 +44,13 @@ export const DEMO_SCENARIOS = [
     imageUrl:
       "https://upload.wikimedia.org/wikipedia/commons/5/5f/Norwegian_Army_Colt_heavy_machine_gun_at_the_Narvik_front.jpg",
   },
+  {
+    name: "Empty Scenario",
+    id: "empty",
+    summary:
+      "An empty scenario template for testing and development purposes.",
+    imageUrl: "",
+  },
 ];
 
 export function useBrowserScenarios() {
@@ -37,12 +60,13 @@ export function useBrowserScenarios() {
 
   // Hàm helper để load lại danh sách
   const reloadScenarios = useCallback(async () => {
-    const { listScenarios } = await getIndexedDb();
-    const scenarios = await listScenarios();
-    // Mặc định reverse như logic cũ
-    setStoredScenarios(scenarios.reverse());
-    // Reset sort về default hoặc giữ logic sort hiện tại nếu cần thiết
-    // Ở đây giữ nguyên logic Vue cũ là chỉ reload list raw
+    // DEPRECATED: IndexedDB loading
+    // const { listScenarios } = await getIndexedDb();
+    // const scenarios = await listScenarios();
+    
+    // Load scenarios from API (JSON files in public/scenarios)
+    const scenarios = await mockScenarioService.listScenarios();
+    setStoredScenarios(scenarios);
   }, []);
 
   // Load danh sách khi mount (tương đương onMounted)
@@ -85,27 +109,45 @@ export function useBrowserScenarios() {
   ], [activeSort]);
 
   async function onAction(action: StoredScenarioAction, scenario: ScenarioMetadata) {
-    const { deleteScenario, duplicateScenario, downloadAsJson } =
-      await getIndexedDb();
+    // DEPRECATED: IndexedDB operations
+    // const { deleteScenario, duplicateScenario, downloadAsJson } =
+    //   await getIndexedDb();
       
     switch (action) {
       case "open":
         router.push(`${MAP_EDITOR_BASE_URL}/${scenario.id}`);
         break;
       case "delete":
+        // Don't allow deleting demo scenarios
+        if (isDemoScenario(scenario.id)) {
+          window.alert("Cannot delete demo scenarios");
+          return;
+        }
         if (
           window.confirm(
             `Are you sure you want to permanently delete the scenario "${scenario.name}"?`,
           )
         ) {
-          await deleteScenario(scenario.id);
+          await mockScenarioService.deleteScenario(scenario.id);
         }
         break;
       case "download":
-        await downloadAsJson(scenario.id);
+        // Download scenario as JSON
+        const scenarioData = await mockScenarioService.loadScenario(scenario.id);
+        if (scenarioData) {
+          const blob = new Blob([JSON.stringify(scenarioData, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${scenario.name}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
         break;
       case "duplicate":
-        await duplicateScenario(scenario.id);
+        await mockScenarioService.duplicateScenario(scenario.id);
         break;
     }
 
@@ -113,39 +155,33 @@ export function useBrowserScenarios() {
   }
 
   async function loadScenario(v: Scenario) {
-    const { addScenario, getScenarioInfo, putScenario } = await getIndexedDb();
-
-    // Nếu object v chưa có id, tạo mới
+    // Check if scenario already exists
     const targetId = v.id ?? nanoid();
-    const existingScenarioInfo = await getScenarioInfo(targetId);
+    const existingScenarioInfo = await mockScenarioService.getScenarioInfo(targetId);
 
     let scenarioId = v.id;
 
     if (existingScenarioInfo) {
       if (
         window.confirm(
-          "A scenario with the same ID is stored in the browser. Do you want to replace it with this scenario?",
+          "A scenario with the same ID already exists. Do you want to replace it?",
         )
       ) {
-        scenarioId = await putScenario(v);
+        scenarioId = await mockScenarioService.saveScenario(v);
       } else {
-        // Nếu user không muốn ghi đè, tạo bản copy với ID mới
-        scenarioId = await addScenario(v, nanoid());
+        // Create a copy with a new ID
+        scenarioId = await mockScenarioService.saveScenario({ ...v, id: nanoid() });
       }
     } else {
-      scenarioId = await addScenario(v);
+      scenarioId = await mockScenarioService.saveScenario(v);
     }
     
     router.push(`${MAP_EDITOR_BASE_URL}/${scenarioId}`);
   }
 
   async function importScenario(scenarioId: string) {
-    const { loadScenario: dbLoadScenario } = await getIndexedDb();
-    const scenario = await dbLoadScenario(scenarioId);
-    if (scenario) {
-      return scenario;
-    }
-    return null;
+    const scenario = await mockScenarioService.loadScenario(scenarioId);
+    return scenario ?? null;
   }
 
   return { 

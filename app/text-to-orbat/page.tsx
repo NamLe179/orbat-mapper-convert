@@ -39,7 +39,9 @@ import {
 import { useNotifications } from "@/hooks/notifications";
 import { saveBlobToLocalFile } from "@/utils/files";
 import { useScenario } from "@/scenariostore";
-import { getIndexedDb } from "@/scenariostore/localdb";
+// DEPRECATED: IndexedDB is no longer used for scenario storage
+// import { getIndexedDb } from "@/scenariostore/localdb";
+import { mockScenarioService } from "@/scenariostore/mockScenarios";
 import { useMediaQuery } from "@/hooks/mediaQuery";
 
 export default function TextToOrbatPage() {
@@ -252,11 +254,10 @@ export default function TextToOrbatPage() {
     try {
       const payload = orbatMapperScenario;
       scenario.io.loadFromObject(payload);
-      // clearUndoRedoStack doesn't exist on store
-
-      const db = await getIndexedDb();
+      
+      // Save scenario to JSON file via API
       const storedScenario = scenario.io.serializeToObject();
-      const scenarioId = await db.addScenario(storedScenario, storedScenario.id);
+      const scenarioId = await mockScenarioService.saveScenario(storedScenario);
 
       await router.push(`/scenario/${scenarioId}`);
       sendNotification({ message: "Scenario opened in editor" });

@@ -1,5 +1,71 @@
+/**
+ * Scenario Settings Manipulations
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE CHỈ gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/customSymbols      - Create custom symbol 
+ * - PUT    /api/scenarios/:scenarioId/customSymbols/:id  - Update custom symbol
+ * - DELETE /api/scenarios/:scenarioId/customSymbols/:id  - Delete custom symbol
+ * 
+ * - POST   /api/scenarios/:scenarioId/symbolFillColors   - Create fill color
+ * - PUT    /api/scenarios/:scenarioId/symbolFillColors/:id - Update fill color
+ * - DELETE /api/scenarios/:scenarioId/symbolFillColors/:id - Delete fill color
+ */
+
 import { nanoid } from "@/utils";
 import { klona } from "klona";
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiCreateCustomSymbol(scenarioId: string, symbol: CustomSymbol): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/customSymbols`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(symbol),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateCustomSymbol(scenarioId: string, id: string, data: Partial<CustomSymbol>): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/customSymbols/${id}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteCustomSymbol(scenarioId: string, id: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/customSymbols/${id}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreateSymbolFillColor(scenarioId: string, color: NSymbolFillColor): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/symbolFillColors`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(color),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateSymbolFillColor(scenarioId: string, id: string, data: SymbolFillColorUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/symbolFillColors/${id}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteSymbolFillColor(scenarioId: string, id: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/symbolFillColors/${id}`, {
+//     method: 'DELETE',
+//   });
+// }
 
 // Config & Types
 import { SYMBOL_FILL_COLORS } from "@/config/colors"; // Removed .ts extension

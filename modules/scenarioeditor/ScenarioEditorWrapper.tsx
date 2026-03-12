@@ -10,7 +10,9 @@ import ScenarioNotFoundPage from "@/modules/scenarioeditor/ScenarioNotFoundPage"
 // Hooks & Stores
 import { useScenario } from "@/scenariostore";
 import { useSelectedItems } from "@/stores/selectedStore";
-import { getIndexedDb } from "@/scenariostore/localdb";
+// DEPRECATED: IndexedDB is no longer used for scenario storage
+// import { getIndexedDb } from "@/scenariostore/localdb";
+import { mockScenarioService, isDemoScenario } from "@/scenariostore/mockScenarios";
 import { ActiveScenarioContext } from "@/components/injects";
 
 interface Props {
@@ -26,11 +28,9 @@ export default function ScenarioEditorWrapper({ scenarioId, children }: Props) {
   const selectedItems = useSelectedItems();
   const currentDemoRef = useRef("");
 
-  // --- Logic trợ giúp ---
-  const isDemoScenario = (id: string) => id.startsWith("demo-");
+  // --- Helper function (using imported isDemoScenario) ---
 
   const saveScenarioIfNecessary = async ({ saveDemo = false } = {}) => {
-    // Giả định canUndo là một thuộc tính hoặc getter trong store
     if (scenario?.store?.canUndo) {
       if (isDemoScenario(scenarioId)) {
         if (!saveDemo) return;
@@ -38,81 +38,50 @@ export default function ScenarioEditorWrapper({ scenarioId, children }: Props) {
           return;
         }
       }
-      await scenario.io.saveToIndexedDb();
+      // Save scenario via API (creates/updates JSON file)
+      await mockScenarioService.saveScenario(scenario.io.serializeToObject());
+      console.log("[ScenarioEditorWrapper] Scenario saved to file");
     }
   };
 
-  // --- Effect: Tương đương watch(scenarioId) ---
+  // --- Effect: Load scenario ---
   useEffect(() => {
     const loadData = async () => {
       console.log("[ScenarioEditorWrapper] Loading scenario:", scenarioId, "isDemoScenario:", isDemoScenario(scenarioId));
       setLocalReady(false);
       setScenarioNotFound(false);
 
-      if (isDemoScenario(scenarioId)) {
-        const demoId = scenarioId.replace("demo-", "");
+      try {
+        // Load scenario via API or from demo files
+        const scenarioData = await mockScenarioService.loadScenario(scenarioId);
         
-        // Chỉ load lại nếu là demo khác hoặc chưa có scenario
-        if (demoId !== currentDemoRef.current || !scenario) {
-          console.log("[ScenarioEditorWrapper] Loading demo scenario:", demoId);
-          // Load demo scenario directly
-          const idUrlMap: Record<string, string> = {
-            falkland82: "/scenarios/falkland82.json",
-            falklands82: "/scenarios/falkland82.json", // Support both variants
-            narvik40: "/scenarios/narvik40.json",
-          };
-          const url = idUrlMap[demoId];
-          
-          if (url) {
-            try {
-              const response = await fetch(url);
-              if (response.ok) {
-                const data = await response.json();
-                const { useNewScenarioStore } = await import("@/scenariostore/newScenarioStore");
-                const newStore = useNewScenarioStore(data);
-                setStore(newStore);
-                currentDemoRef.current = demoId;
-                selectedItems.clear();
-                selectedItems.setShowScenarioInfo(true);
-                console.log("[ScenarioEditorWrapper] Demo scenario loaded successfully");
-              } else {
-                console.error("Failed to fetch demo scenario:", response.status, response.statusText);
-                setScenarioNotFound(true);
-              }
-            } catch (e) {
-              console.error("Failed to load demo scenario", e);
-              setScenarioNotFound(true);
-            }
-          } else {
-            console.error("Unknown demo scenario ID:", demoId);
-            setScenarioNotFound(true);
-          }
-        } else {
-          console.log("[ScenarioEditorWrapper] Demo scenario already loaded, skipping");
-        }
-        setLocalReady(true);
-      } else {
-        console.log("[ScenarioEditorWrapper] Loading from IndexedDB:", scenarioId);
-        const { loadScenario } = await getIndexedDb();
-        const idbscenario = await loadScenario(scenarioId);
-        
-        if (idbscenario) {
+        if (scenarioData) {
           const { useNewScenarioStore } = await import("@/scenariostore/newScenarioStore");
-          const newStore = useNewScenarioStore(idbscenario);
+          const newStore = useNewScenarioStore(scenarioData);
           setStore(newStore);
+          
+          if (isDemoScenario(scenarioId)) {
+            currentDemoRef.current = scenarioId.replace("demo-", "");
+          }
+          
           selectedItems.clear();
           selectedItems.setShowScenarioInfo(true);
+          console.log("[ScenarioEditorWrapper] Scenario loaded successfully:", scenarioId);
         } else {
+          console.error("[ScenarioEditorWrapper] Scenario not found:", scenarioId);
           setScenarioNotFound(true);
-          console.error("Scenario not found in indexeddb");
         }
-        setLocalReady(true);
+      } catch (error) {
+        console.error("[ScenarioEditorWrapper] Error loading scenario:", error);
+        setScenarioNotFound(true);
       }
+      
+      setLocalReady(true);
     };
 
     loadData();
 
-    // Cleanup function: Tương đương onBeforeRouteLeave (một phần)
+    // Cleanup function: Save on route leave
     return () => {
       saveScenarioIfNecessary({ saveDemo: true });
     };

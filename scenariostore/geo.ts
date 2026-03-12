@@ -1,3 +1,27 @@
+/**
+ * Scenario Geo & Layers Management
+ * 
+ * Cơ chế hoạt động:
+ * - FE gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/layers              - Create layer 
+ * - PUT    /api/scenarios/:scenarioId/layers/:layerId     - Update layer
+ * - DELETE /api/scenarios/:scenarioId/layers/:layerId     - Delete layer
+ * 
+ * - POST   /api/scenarios/:scenarioId/features            - Create feature 
+ * - PUT    /api/scenarios/:scenarioId/features/:featureId - Update feature
+ * - DELETE /api/scenarios/:scenarioId/features/:featureId - Delete feature
+ * 
+ * - POST   /api/scenarios/:scenarioId/mapLayers           - Create map layer 
+ * - PUT    /api/scenarios/:scenarioId/mapLayers/:layerId  - Update map layer
+ * - DELETE /api/scenarios/:scenarioId/mapLayers/:layerId  - Delete map layer
+ * 
+ * - POST   /api/scenarios/:scenarioId/units/:unitId/positions - Add unit position
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/state     - Update unit state
+ */
+
 import { useMemo } from "react";
 import type { NewScenarioStore } from "@/scenariostore/newScenarioStore";
 import { useScenarioState } from "@/scenariostore/useScenarioState";
@@ -23,6 +47,87 @@ import { moveItemMutable, nanoid, removeElement } from "@/utils";
 import type { DropTarget } from "@/components/types";
 import type { Geometry } from "geojson";
 import { updateCurrentUnitState } from "@/scenariostore/time";
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiCreateLayer(scenarioId: string, layer: NScenarioLayer): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/layers`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(layer),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateLayer(scenarioId: string, layerId: string, data: ScenarioLayerUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/layers/${layerId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteLayer(scenarioId: string, layerId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/layers/${layerId}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreateFeature(scenarioId: string, layerId: string, feature: NScenarioFeature): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/features`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ ...feature, layerId }),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateFeature(scenarioId: string, featureId: string, data: ScenarioFeatureUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/features/${featureId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteFeature(scenarioId: string, featureId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/features/${featureId}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiCreateMapLayer(scenarioId: string, mapLayer: ScenarioMapLayer): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/mapLayers`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(mapLayer),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateMapLayer(scenarioId: string, layerId: string, data: ScenarioMapLayerUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/mapLayers/${layerId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteMapLayer(scenarioId: string, layerId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/mapLayers/${layerId}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiAddUnitPosition(scenarioId: string, unitId: string, coordinates: Position, atTime: number): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/positions`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ coordinates, atTime }),
+//   });
+// }
 
 // --- Types ---
 

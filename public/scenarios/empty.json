@@ -1,0 +1,49 @@
+{
+  "id": "demo-empty",
+  "type": "ORBAT-mapper",
+  "version": "0.33.0",
+  "meta": {
+    "createdDate": "2026-03-09T12:00:00.000Z",
+    "lastModifiedDate": "2026-03-09T12:00:00.000Z"
+  },
+  "name": "Empty Scenario",
+  "startTime": "2026-03-09T12:00:00.000Z",
+  "timeZone": "UTC",
+  "description": "An empty scenario template for testing and development purposes. Use this as a starting point for creating new scenarios.",
+  "symbologyStandard": "app6",
+  "sides": [],
+  "events": [],
+  "layers": [
+    {
+      "id": "default-layer",
+      "name": "Features",
+      "features": []
+    }
+  ],
+  "mapLayers": [],
+  "settings": {
+    "rangeRingGroups": [
+      { "name": "GR1" },
+      { "name": "GR2" }
+    ],
+    "statuses": [],
+    "map": {
+      "baseMapId": "OpenStreetMap"
+    },
+    "supplyClasses": [
+      { "name": "Class I" },
+      { "name": "Class II" },
+      { "name": "Class III" },
+      { "name": "Class IV" },
+      { "name": "Class V" }
+    ],
+    "supplyUoMs": [
+      { "name": "Kilogram", "code": "KG", "type": "weight" },
+      { "name": "Liter", "code": "LI", "type": "volume" },
+      { "name": "Each", "code": "EA", "type": "quantity" },
+      { "name": "Meter", "code": "MR", "type": "distance" },
+      { "name": "Gallon", "code": "GL", "type": "volume" }
+    ],
+    "symbolFillColors": []
+  }
+}

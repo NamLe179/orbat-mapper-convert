@@ -1,3 +1,15 @@
+/**
+ * Scenario Info Panel
+ * 
+ * This component displays and allows editing of scenario metadata.
+ * 
+ * API Integration Notes:
+ * When backend is ready, updateScenarioInfo should trigger:
+ * - PUT /api/scenarios/:scenarioId/info - Update scenario metadata
+ * 
+ * Consider debouncing rapid changes before sending to server.
+ */
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";

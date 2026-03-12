@@ -1,3 +1,19 @@
+/**
+ * New Scenario View
+ * 
+ * This component handles creating a new scenario with initial configuration.
+ * 
+ * API Integration Notes:
+ * 
+ * When backend is ready, the createNewScenario function should:
+ * 1. Call POST /api/scenarios to create scenario in database
+ * 2. Receive the scenario ID from backend
+ * 3. Navigate to the scenario editor with the new ID
+ * 
+ * Current implementation saves to JSON file locally via mockScenarioService.
+ * Replace mockScenarioService.createScenario() with actual backend API call.
+ */
+
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -27,7 +43,9 @@ import { SID } from "@/symbology/values";
 import { nanoid } from "@/utils";
 import { Sidc } from "@/symbology/sidc";
 import { echelonItems } from "@/symbology/helpers";
-import { getIndexedDb } from "@/scenariostore/localdb";
+// DEPRECATED: IndexedDB is no longer used for scenario storage
+// import { getIndexedDb } from "@/scenariostore/localdb";
+import { mockScenarioService } from "@/scenariostore/mockScenarios";
 import { MAP_EDIT_MODE_ROUTE } from "@/router/name";
 import { CUSTOM_SYMBOL_PREFIX } from "@/config/constants";
 
@@ -181,8 +199,11 @@ export default function NewScenarioView() {
     
     // Note: clearUndoRedoStack is available from immerStore hook, not directly from scenario.store
     // If needed, it should be accessed through the store's update mechanism or a separate hook
-    const { addScenario } = await getIndexedDb();
-    const scenarioId = await addScenario(scenario.io.serializeToObject());
+    
+    // Save scenario to JSON file via API
+    const scenarioData = scenario.io.serializeToObject();
+    const scenarioId = await mockScenarioService.createScenario(scenarioData);
+    
     router.push(`/${MAP_EDIT_MODE_ROUTE}/${scenarioId}`);
   };
 

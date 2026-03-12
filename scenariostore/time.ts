@@ -1,3 +1,21 @@
+/**
+ * Scenario Time & Events Management
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE CHỈ gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * Ví dụ flow tạo Event:
+ * 1. FE gọi: POST /api/scenarios/:scenarioId/events với body { title, startTime, ... }
+ * 2. BE tạo event, sinh ID, lưu DB, trả về { id, title, startTime, ... }
+ * 3. FE nhận response, cập nhật store.eventMap[id] = response.data
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/events          - Create event 
+ * - PUT    /api/scenarios/:scenarioId/events/:eventId - Update event
+ * - DELETE /api/scenarios/:scenarioId/events/:eventId - Delete event
+ */
+
 import dayjs, { type ManipulateType } from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -5,6 +23,31 @@ import turfLength from "@turf/length";
 import turfAlong from "@turf/along";
 import { lineString } from "@turf/helpers";
 import { klona } from "klona";
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiCreateEvent(scenarioId: string, event: NScenarioEvent): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/events`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(event),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateEvent(scenarioId: string, eventId: string, data: ScenarioEventUpdate): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/events/${eventId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteEvent(scenarioId: string, eventId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/events/${eventId}`, {
+//     method: 'DELETE',
+//   });
+// }
 
 // Utils
 import { nanoid } from "@/utils";

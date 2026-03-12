@@ -1,5 +1,62 @@
+/**
+ * Unit State Manipulations
+ * 
+ * Cơ chế hoạt động khi ghép BE:
+ * - FE CHỈ gửi request và nhận response từ BE
+ * - Sau khi nhận response từ BE, cập nhật local state (Zustand store)
+ * 
+ * API Endpoints:
+ * - POST   /api/scenarios/:scenarioId/units/:unitId/state          - Add state entry 
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/state/:stateId - Update state entry
+ * - DELETE /api/scenarios/:scenarioId/units/:unitId/state/:stateId - Delete state entry
+ * 
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/state/clear    - Clear all state
+ * - POST   /api/scenarios/:scenarioId/units/:unitId/positions      - Add position at time
+ * - PUT    /api/scenarios/:scenarioId/units/:unitId/positions/:t   - Update position at time
+ * - DELETE /api/scenarios/:scenarioId/units/:unitId/positions/:t   - Delete position at time
+ */
+
 import { nanoid, mergeArray } from "@/utils";
 import { klona } from "klona";
+
+// TODO: API Integration - Uncomment and configure when backend is ready
+// async function apiAddUnitState(scenarioId: string, unitId: string, state: NState): Promise<string> {
+//   const response = await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/state`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(state),
+//   });
+//   const data = await response.json();
+//   return data.id;
+// }
+
+// async function apiUpdateUnitState(scenarioId: string, unitId: string, stateId: string, data: Partial<NState>): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/state/${stateId}`, {
+//     method: 'PUT',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify(data),
+//   });
+// }
+
+// async function apiDeleteUnitState(scenarioId: string, unitId: string, stateId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/state/${stateId}`, {
+//     method: 'DELETE',
+//   });
+// }
+
+// async function apiClearUnitState(scenarioId: string, unitId: string): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/state/clear`, {
+//     method: 'PUT',
+//   });
+// }
+
+// async function apiAddUnitPosition(scenarioId: string, unitId: string, position: Position, atTime: number): Promise<void> {
+//   await fetch(`/api/scenarios/${scenarioId}/units/${unitId}/positions`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({ position, atTime }),
+//   });
+// }
 
 // Project imports
 import type { NewScenarioStore } from "@/scenariostore/newScenarioStore";
