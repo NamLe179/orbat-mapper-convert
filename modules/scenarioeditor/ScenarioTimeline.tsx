@@ -267,36 +267,37 @@ export default function ScenarioTimeline() {
     [setCurrentTime]
   );
 
-  // Pointer Refs needed for drag calculation preservation between renders
-  const dragRef = useRef({ startX: 0, startTimestamp: 0, accumulatedDrag: 0 });
+  const dragRef = useRef({ startX: 0, startTimestamp: 0, didDrag: false });
+  const isPointerInteractionRef = useRef(false);
 
   const onPointerDown = (evt: React.PointerEvent) => {
     const el = elRef.current;
     if (!el) return;
+
+    throttledSetCurrentTime.cancel();
     
     dragRef.current.startX = evt.clientX;
     dragRef.current.startTimestamp = scenarioTime.valueOf();
-    dragRef.current.accumulatedDrag = 0;
+    dragRef.current.didDrag = false;
     
     el.setPointerCapture(evt.pointerId);
+    isPointerInteractionRef.current = true;
     setIsPointerInteraction(true);
     setIsDragging(false);
     setAnimate(false); // Disable transition during drag
   };
 
   const onPointerMove = (evt: React.PointerEvent) => {
-    if (isPointerInteraction) {
+    if (isPointerInteractionRef.current) {
       const diff = evt.clientX - dragRef.current.startX;
-      dragRef.current.accumulatedDrag += Math.abs(diff);
 
-      if (dragRef.current.accumulatedDrag < 5) {
+      if (Math.abs(diff) < 5) {
         setIsDragging(false);
         return;
       } else {
+        dragRef.current.didDrag = true;
         setIsDragging(true);
       }
-
-      setDraggedDiff(diff);
 
       const msPerPixel = (MS_PER_HOUR * 24) / majorWidth;
       const newTs = Math.floor(dragRef.current.startTimestamp - diff * msPerPixel);
@@ -305,7 +306,15 @@ export default function ScenarioTimeline() {
   };
 
   const onPointerUp = (evt: React.PointerEvent) => {
-    if (!isDragging && evt.button !== 2) {
+    const el = elRef.current;
+    if (el?.hasPointerCapture(evt.pointerId)) {
+      el.releasePointerCapture(evt.pointerId);
+    }
+
+    const finalDiff = evt.clientX - dragRef.current.startX;
+    const didDrag = dragRef.current.didDrag || Math.abs(finalDiff) >= 5;
+
+    if (!didDrag && evt.button !== 2) {
       // Click interaction (Jump to time)
       const { date, diff } = calculatePixelDate(evt.clientX);
       
@@ -316,14 +325,35 @@ export default function ScenarioTimeline() {
       date.setUTCMinutes(Math.round(date.getUTCMinutes() / 15) * 15);
       setCurrentTime(date.valueOf());
     } else {
-        // End Drag
+        const msPerPixel = (MS_PER_HOUR * 24) / majorWidth;
+        const finalTs = Math.floor(dragRef.current.startTimestamp - finalDiff * msPerPixel);
+
+        throttledSetCurrentTime.cancel();
+        setCurrentTime(finalTs);
+
         setAnimate(false);
         setDraggedDiff(0);
     }
 
+    isPointerInteractionRef.current = false;
     setIsPointerInteraction(false);
     setIsDragging(false);
-    dragRef.current.accumulatedDrag = 0;
+    dragRef.current.didDrag = false;
+  };
+
+  const onPointerCancel = (evt: React.PointerEvent) => {
+    const el = elRef.current;
+    if (el?.hasPointerCapture(evt.pointerId)) {
+      el.releasePointerCapture(evt.pointerId);
+    }
+
+    throttledSetCurrentTime.cancel();
+    setAnimate(false);
+    setDraggedDiff(0);
+    isPointerInteractionRef.current = false;
+    setIsPointerInteraction(false);
+    setIsDragging(false);
+    dragRef.current.didDrag = false;
   };
 
   // Reset Animation after jump
@@ -336,6 +366,12 @@ export default function ScenarioTimeline() {
       return () => clearTimeout(timer);
     }
   }, [animate]);
+
+  useEffect(() => {
+    return () => {
+      throttledSetCurrentTime.cancel();
+    };
+  }, [throttledSetCurrentTime]);
 
   const onHover = (e: React.MouseEvent) => {
     const { date } = calculatePixelDate(e.clientX);
@@ -382,6 +418,7 @@ export default function ScenarioTimeline() {
         className="bg-background border-border relative w-full transform overflow-x-hidden border-t text-sm transition-all select-none"
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onPointerMove={onPointerMove}
         onWheel={onWheel}
         onMouseMove={onHover}
