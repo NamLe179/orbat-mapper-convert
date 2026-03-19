@@ -8,7 +8,8 @@ import { useMediaQuery } from "usehooks-ts";
 import { 
   ActiveMapContext, 
   ActiveFeatureSelectInteractionContext, 
-  useActiveScenario 
+  useActiveScenario,
+  useTimeModal,
 } from "@/components/injects";
 import { useUiStore } from "@/stores/uiStore";
 import { usePlaybackStore } from "@/stores/playbackStore";
@@ -58,6 +59,7 @@ export default function ScenarioEditorMap({
   const [selectInteraction, setSelectInteraction] = useState<Select | null>(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const { getModalTimestamp } = useTimeModal();
   
   // Handler for opening settings panel
   const handleShowSettings = useCallback(() => {
@@ -100,7 +102,11 @@ export default function ScenarioEditorMap({
   const updatePlayback = useCallback(() => {
     if (!playback.playbackRunning) return;
 
-    if (playback.playbackLooping && playback.endMarker !== undefined && playback.startMarker !== undefined) {
+    if (
+      playback.playbackLooping &&
+      playback.endMarker !== undefined &&
+      playback.startMarker !== undefined
+    ) {
       if (scn.store.state.currentTime >= playback.endMarker) {
         scn.time.setCurrentTime(playback.startMarker);
         rafRef.current = requestAnimationFrame(updatePlayback);
@@ -110,6 +116,7 @@ export default function ScenarioEditorMap({
 
     const newTime = scn.store.state.currentTime + playback.playbackSpeed;
     scn.time.setCurrentTime(newTime);
+
     rafRef.current = requestAnimationFrame(updatePlayback);
   }, [playback, scn]);
 
@@ -134,10 +141,12 @@ export default function ScenarioEditorMap({
 
   // --- Handlers ---
   const openTimeDialog = async () => {
-    // getModalTimestamp should be available through scenario context or time modal
-    // For now, use a simple timestamp input - TODO: implement proper modal
-    const newTimestamp = Date.now(); // Placeholder
-    scn.time.setCurrentTime(newTimestamp);
+    const newTimestamp = await getModalTimestamp(scn.store.state.currentTime, {
+      timeZone: scn.store.state.info.timeZone,
+    });
+    if (newTimestamp !== undefined) {
+      scn.time.setCurrentTime(newTimestamp);
+    }
   };
 
   return (
@@ -219,8 +228,8 @@ export default function ScenarioEditorMap({
               </>
             )}
 
-            <KeyboardScenarioActions />
-            <SearchScenarioActions />
+            {mapInstance && <KeyboardScenarioActions />}
+            {mapInstance && <SearchScenarioActions />}
             
             {/* Toolbar overlay on map */}
             {ui.showToolbar && (

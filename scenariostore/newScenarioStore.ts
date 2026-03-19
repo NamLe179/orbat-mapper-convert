@@ -563,16 +563,6 @@ function createVanillaStore(initialState: ScenarioState) {
 export function useNewScenarioStore(data: Scenario): NewScenarioStore {
   const inputState = prepareScenario(data);
   const store = createVanillaStore(inputState);
-  
-  // Simple history tracking
-  const history: ScenarioState[] = [];
-  const future: ScenarioState[] = [];
-  let isUndoRedo = false;
-  let saveTimeout: NodeJS.Timeout | null = null;
-  let pendingSave = false;
-  
-  // Undo/Redo listeners
-  const undoRedoListeners = new Set<(payload: any) => void>();
 
   const storeWrapper: NewScenarioStore = {
     // Getter for state to allow direct access (store.state.xyz)
@@ -580,120 +570,26 @@ export function useNewScenarioStore(data: Scenario): NewScenarioStore {
       return store.getState();
     },
     get canUndo() {
-      return history.length > 0;
+      return false;
     },
     get canRedo() {
-      return future.length > 0;
+      return false;
     },
-    // Update method mimicking useImmerStore
-    update: (recipe, meta) => {
-      if (!isUndoRedo) {
-        // Debounce history saves - only save if no update in last 50ms
-        if (saveTimeout) {
-          clearTimeout(saveTimeout);
-        }
-        
-        if (!pendingSave) {
-          // First update in a sequence - save current state immediately
-          const currentState = klona(store.getState());
-          history.push(currentState);
-          future.length = 0;
-          if (history.length > 50) {
-            history.shift();
-          }
-          console.log('[History] Saved state (immediate). Action:', meta?.label, 'History length:', history.length);
-          pendingSave = true;
-        }
-        
-        // Reset debounce timer
-        saveTimeout = setTimeout(() => {
-          pendingSave = false;
-          saveTimeout = null;
-        }, 50);
-      }
+    // Undo/redo disabled: apply updates directly without history bookkeeping.
+    update: (recipe) => {
       store.setState(recipe);
-      if (meta) {
-        // console.log("Action:", meta.label);
-      }
     },
-    groupUpdate: (callback, meta) => {
-        // For group updates, save state once before all operations
-        if (!isUndoRedo && !pendingSave) {
-          const currentState = klona(store.getState());
-          history.push(currentState);
-          future.length = 0;
-          if (history.length > 50) {
-            history.shift();
-          }
-          console.log('[History] Saved state (group). Action:', meta?.label, 'History length:', history.length);
-          pendingSave = true;
-          
-          // Reset after group is done
-          setTimeout(() => {
-            pendingSave = false;
-          }, 50);
-        }
+    groupUpdate: (callback) => {
         callback();
     },
     undo: () => {
-      if (history.length === 0) return;
-      
-      console.log('[History] Undo - History length:', history.length, 'Future length:', future.length);
-      isUndoRedo = true;
-      // Save current state to future
-      future.push(klona(store.getState()));
-      // Restore previous state - replace entire state
-      const previousState = history.pop()!;
-      
-      // Replace state completely and force all subscribers to update
-      store.setState(() => previousState, true);
-      
-      isUndoRedo = false;
-      console.log('[History] After undo - History length:', history.length, 'Future length:', future.length);
-      
-      // Notify all subscribers that state has changed dramatically
-      const currentState = store.getState();
-      store.setState(() => ({
-        ...currentState,
-        unitStateCounter: currentState.unitStateCounter + 1,
-        featureStateCounter: currentState.featureStateCounter + 1,
-        settingsStateCounter: currentState.settingsStateCounter + 1,
-      }));
-      
-      // Notify listeners
-      undoRedoListeners.forEach(cb => cb({ action: "undo", meta: {} }));
+      // no-op: undo/redo feature intentionally removed
     },
     redo: () => {
-      if (future.length === 0) return;
-      
-      console.log('[History] Redo - History length:', history.length, 'Future length:', future.length);
-      isUndoRedo = true;
-      // Save current state to history
-      history.push(klona(store.getState()));
-      // Restore next state - replace entire state
-      const nextState = future.pop()!;
-      
-      // Replace state completely and force all subscribers to update
-      store.setState(() => nextState, true);
-      
-      isUndoRedo = false;
-      console.log('[History] After redo - History length:', history.length, 'Future length:', future.length);
-      
-      // Notify all subscribers that state has changed dramatically
-      const currentState = store.getState();
-      store.setState(() => ({
-        ...currentState,
-        unitStateCounter: currentState.unitStateCounter + 1,
-        featureStateCounter: currentState.featureStateCounter + 1,
-        settingsStateCounter: currentState.settingsStateCounter + 1,
-      }));
-      
-      // Notify listeners
-      undoRedoListeners.forEach(cb => cb({ action: "redo", meta: {} }));
+      // no-op: undo/redo feature intentionally removed
     },
-    onUndoRedo: (callback) => {
-      undoRedoListeners.add(callback);
-      return () => undoRedoListeners.delete(callback);
+    onUndoRedo: (_callback) => {
+      return () => {};
     },
     subscribe: (listener) => {
       // Wrap Zustand's subscribe to match our expected signature
