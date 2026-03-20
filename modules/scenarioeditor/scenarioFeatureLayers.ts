@@ -46,6 +46,7 @@ const undoActionLabels: ActionLabel[] = [
 export function useScenarioFeatureLayers(olMap: OLMap | null) {
   const scn = useActiveScenario();
   const { scenarioFeatureStyle, clearCache, invalidateStyle } = useFeatureStyles(scn.geo);
+  const dynamicFeatureSignatureRef = useRef(new Map<FeatureId, string>());
 
   // Helper function definitions need to be inside the hook to access scope variables
   // or passed as stable callbacks.
@@ -179,6 +180,115 @@ export function useScenarioFeatureLayers(olMap: OLMap | null) {
     });
   }
 
+  function syncFeatureLayersFromStore(
+    options: {
+      filterVisible?: boolean;
+    } = {},
+  ) {
+    if (!olMap) return;
+    const { filterVisible = true } = options;
+    const projection = olMap.getView().getProjection();
+    const olFeatureLayersGroup = getOrCreateLayerGroup(olMap);
+    const olLayers = olFeatureLayersGroup.getLayers();
+    const olLayersArray = olLayers.getArray();
+    const olLayerById = new Map<FeatureId, VectorLayer<any>>();
+    for (const existingLayer of olLayersArray) {
+      if (existingLayer instanceof VectorLayer) {
+        const id = existingLayer.get("id");
+        if (typeof id === "string" || typeof id === "number") {
+          olLayerById.set(id, existingLayer);
+        }
+      }
+    }
+
+    for (const layer of scn.geo.layers) {
+      let olLayer = olLayerById.get(layer.id);
+      if (!olLayer) {
+        olLayer = olCreateScenarioFeatureLayer(layer, { projection, filterVisible: false });
+        olLayers.push(olLayer);
+        olLayerById.set(layer.id, olLayer);
+      }
+
+      const visibleLayer = !layer.isHidden && !(filterVisible && layer._hidden);
+      olLayer.setVisible(visibleLayer);
+
+      const source = olLayer.getSource();
+      if (!source) continue;
+
+      const existingById = new Map<FeatureId, Feature>();
+      source.getFeatures().forEach((feature: Feature) => {
+        const id = feature.getId();
+        if (typeof id === "string" || typeof id === "number") {
+          existingById.set(id, feature);
+        }
+      });
+
+      const visibleFeatures = layer.features.filter(
+        (f) => !filterVisible || !f._hidden,
+      );
+
+      const expectedIds = new Set<FeatureId>();
+      for (const feature of visibleFeatures) {
+        expectedIds.add(feature.id);
+        const existing = existingById.get(feature.id);
+        const isDynamic = !!feature.state?.length;
+
+        if (!isDynamic && existing) {
+          continue;
+        }
+
+        if (isDynamic && existing) {
+          const signature = `${feature._hidden ? 1 : 0}|${feature._state?.t ?? "-"}|${feature._state?.geometry?.type ?? "-"}`;
+          const prevSignature = dynamicFeatureSignatureRef.current.get(feature.id);
+          if (prevSignature === signature) {
+            continue;
+          }
+          dynamicFeatureSignatureRef.current.set(feature.id, signature);
+        }
+
+        if (!existing || isDynamic) {
+          if (existing) {
+            source.removeFeature(existing);
+          }
+          const created = createScenarioLayerFeatures([feature], projection);
+          if (created.length > 0) {
+            source.addFeature(created[0]);
+          }
+        }
+      }
+
+      existingById.forEach((feature, id: FeatureId) => {
+        if (!expectedIds.has(id)) {
+          source.removeFeature(feature);
+          dynamicFeatureSignatureRef.current.delete(id);
+        }
+      });
+
+      olLayer.changed();
+    }
+
+    // Keep OL layers aligned with store layers when layers are deleted.
+    const allLayerIds = new Set<FeatureId>(scn.geo.layers.map((layer) => layer.id));
+    olLayersArray.slice().forEach((layer) => {
+        const layerId = layer.get("id");
+        if ((typeof layerId === "string" || typeof layerId === "number") && !allLayerIds.has(layerId)) {
+          if (layer instanceof VectorLayer) {
+            layer
+              .getSource()
+              ?.getFeatures()
+              .forEach((feature: Feature) => {
+                const id = feature.getId();
+                if (typeof id === "string" || typeof id === "number") {
+                  dynamicFeatureSignatureRef.current.delete(id);
+                }
+              });
+            layer.getSource()?.clear();
+          }
+          olLayers.remove(layer);
+        }
+      });
+  }
+
   // --- Effects ---
 
   // 1. Subscribe to Feature Layer Events
@@ -288,6 +398,7 @@ export function useScenarioFeatureLayers(olMap: OLMap | null) {
 
   return {
     initializeFeatureLayersFromStore,
+    syncFeatureLayersFromStore,
   };
 }
 

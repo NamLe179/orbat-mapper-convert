@@ -86,7 +86,7 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
 
   // Map layers and feature layers hooks
   const { initializeFromStore: loadMapLayers } = useScenarioMapLayers(olMap);
-  const { initializeFeatureLayersFromStore } = useScenarioFeatureLayers(olMap);
+  const { initializeFeatureLayersFromStore, syncFeatureLayersFromStore } = useScenarioFeatureLayers(olMap);
   
   // History & Interactions
   const { 
@@ -98,7 +98,7 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
   });
 
   // Hover, select, and other interactions
-  const { redraw: redrawSelectedUnits, unitSelectInteraction, boxSelectInteraction } = useUnitSelectInteraction([unitLayer], olMap, {
+  const { unitSelectInteraction, boxSelectInteraction } = useUnitSelectInteraction([unitLayer], olMap, {
     enable: unitSelectEnabled,
   });
   
@@ -227,27 +227,17 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
     measurementUnits: measurementUnit,
   });
 
-  // Watch: Redraw Units (geo.everyVisibleUnit)
-  useEffect(() => {
-    // Use the functions already returned from hooks at top level
-    drawUnits();
-    drawHistory();
-    redrawSelectedUnits();
-    drawRangeRings();
-  }, [geo.everyVisibleUnit, drawUnits, drawHistory, redrawSelectedUnits, drawRangeRings]);
-
   // Watch: Settings Change -> Clear Cache & Redraw
   useEffect(() => {
     clearUnitStyleCache();
     drawUnits();
   }, [settingsStore, symbolSettings, mapSettingsStore]);
 
-  // Watch: Time / Filter -> Reload Features
+  // Watch: Time / Filter -> Sync Features incrementally (avoid full rebuild per tick)
   useEffect(() => {
     const doNotFilterLayers = uiStore.layersPanelActive;
 
-    initializeFeatureLayersFromStore({
-      doClearCache: false,
+    syncFeatureLayersFromStore({
       filterVisible: !doNotFilterLayers,
     });
 
@@ -258,7 +248,7 @@ export default function ScenarioMapLogic({ olMap, onMapReady }: ScenarioMapLogic
       selectedFeatureIds.clear();
       ids.forEach(id => selectedFeatureIds.add(id));
     }
-  }, [store.state.currentTime, uiStore.layersPanelActive, store.state.featureStateCounter, initializeFeatureLayersFromStore, selectedFeatureIds]);
+  }, [store.state.currentTime, uiStore.layersPanelActive, store.state.featureStateCounter, syncFeatureLayersFromStore, selectedFeatureIds]);
 
   // Handle Export Action
   useEffect(() => {

@@ -12,6 +12,7 @@ import { clusterEach } from "@turf/clusters";
 import circle from "@turf/circle";
 import union from "@turf/union";
 import { featureCollection } from "@turf/helpers";
+import type { Feature as GeoJsonFeature, Polygon } from "geojson";
 
 // Project imports
 import type { NUnit } from "@/types/internalModels";
@@ -116,6 +117,10 @@ function useRangeRingStyles() {
 export function useRangeRingsLayer(olMap: OLMap | null) {
   const { geo } = useActiveScenario();
   const units = geo.everyVisibleUnit; // Lấy data từ context
+  const renderSignatureRef = useRef(new Map<string, string>());
+  const groupedMergeCacheRef = useRef(
+    new Map<string, { inputSignature: string; merged: GeoJsonFeature<Polygon> }>(),
+  );
 
   // 1. Setup Layer
   const layer = useMemo(() => createLayer(), []);
@@ -141,12 +146,22 @@ export function useRangeRingsLayer(olMap: OLMap | null) {
     const source = layer.getSource();
     if (!source) return;
 
-    source.clear();
-    clearCache();
+    const existingById = new Map<string, Feature>();
+    source.getFeatures().forEach((feature) => {
+      const id = feature.get("id");
+      if (typeof id === "string") {
+        existingById.set(id, feature as Feature);
+      }
+    });
 
     // Lọc units có rings
     const unitsWithRings = units.filter((u) => u.rangeRings?.length);
-    if (unitsWithRings.length === 0) return;
+    if (unitsWithRings.length === 0) {
+      source.clear();
+      renderSignatureRef.current.clear();
+      groupedMergeCacheRef.current.clear();
+      return;
+    }
 
     const rangeRingsFeatures = unitsWithRings.map(createRangeRings).flat();
     const rangeRingsFC = featureCollection(rangeRingsFeatures);
@@ -158,24 +173,79 @@ export function useRangeRingsLayer(olMap: OLMap | null) {
       rangeRingsFC.features.filter((r) => r.properties.isGroup),
     );
 
-    // Xử lý Group
+    const expectedIds = new Set<string>();
+
+    // Xử lý không group (incremental)
+    unGrouped.features.forEach((ring) => {
+      const id = String(ring.properties?.id ?? "");
+      if (!id) return;
+
+      expectedIds.add(id);
+      const signature = JSON.stringify(ring.geometry.coordinates);
+      const previousSignature = renderSignatureRef.current.get(id);
+      const existing = existingById.get(id);
+
+      if (existing && previousSignature === signature) {
+        return;
+      }
+
+      if (existing) {
+        source.removeFeature(existing);
+      }
+      source.addFeature(gjf.readFeature(ring) as Feature);
+      renderSignatureRef.current.set(id, signature);
+    });
+
+    // Xử lý Group (cache merge theo input signature)
     clusterEach(grouped, "id", (cluster) => {
       if (!cluster.features.length) return;
-      const merged =
-        cluster.features.length > 1
-          ? union(cluster, {
-              properties: { id: cluster.features[0].properties.id, isGroup: true },
-            })
-          : cluster.features[0]; 
-      if (merged) {
-        source.addFeature(gjf.readFeature(merged) as Feature);
+      const id = String(cluster.features[0].properties.id ?? "");
+      if (!id) return;
+
+      expectedIds.add(id);
+      const inputSignature = cluster.features
+        .map((f) => JSON.stringify(f.geometry.coordinates))
+        .join("|");
+
+      let merged = groupedMergeCacheRef.current.get(id);
+      if (!merged || merged.inputSignature !== inputSignature) {
+        const mergedFeature =
+          cluster.features.length > 1
+            ? (union(cluster, {
+                properties: { id, isGroup: true },
+              }) as GeoJsonFeature<Polygon> | null)
+            : (cluster.features[0] as GeoJsonFeature<Polygon>);
+
+        if (!mergedFeature) return;
+        merged = { inputSignature, merged: mergedFeature };
+        groupedMergeCacheRef.current.set(id, merged);
+      }
+
+      const geometrySignature = JSON.stringify(merged.merged.geometry.coordinates);
+      const previousSignature = renderSignatureRef.current.get(id);
+      const existing = existingById.get(id);
+
+      if (existing && previousSignature === geometrySignature) {
+        return;
+      }
+
+      if (existing) {
+        source.removeFeature(existing);
+      }
+      source.addFeature(gjf.readFeature(merged.merged) as Feature);
+      renderSignatureRef.current.set(id, geometrySignature);
+    });
+
+    // Remove stale range-ring features
+    existingById.forEach((feature, id) => {
+      if (!expectedIds.has(id)) {
+        source.removeFeature(feature);
+        renderSignatureRef.current.delete(id);
+        groupedMergeCacheRef.current.delete(id);
       }
     });
 
-    // Xử lý không group
-    if (unGrouped.features.length > 0) {
-      source.addFeatures(gjf.readFeatures(unGrouped) as Feature[]);
-    }
+    clearCache();
   }, [units, layer, clearCache]);
 
   // Tự động vẽ khi units thay đổi

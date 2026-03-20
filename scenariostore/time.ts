@@ -22,6 +22,7 @@ import timezone from "dayjs/plugin/timezone";
 import turfLength from "@turf/length";
 import turfAlong from "@turf/along";
 import { lineString } from "@turf/helpers";
+import type { Feature as TurfFeature, LineString as TurfLineString } from "geojson";
 import { klona } from "klona";
 
 // TODO: API Integration - Uncomment and configure when backend is ready
@@ -120,6 +121,173 @@ export function createInitialState(unit: NUnit): CurrentState | null {
   return null;
 }
 
+type UnitStateCacheEntry = {
+  stateRef: NUnit["state"];
+  timestamps: number[];
+  prefixStates: Array<CurrentState | null>;
+};
+
+type FeatureStateCacheEntry = {
+  stateRef: NScenarioFeature["state"];
+  timestamps: number[];
+  prefixStates: Array<CurrentScenarioFeatureState | null>;
+};
+
+const unitStateCache = new WeakMap<NUnit, UnitStateCacheEntry>();
+const featureStateCache = new WeakMap<NScenarioFeature, FeatureStateCacheEntry>();
+type InterpolationSegmentCacheEntry = {
+  signature: string;
+  line: TurfFeature<TurfLineString>;
+  averageSpeed: number;
+  startTime: number;
+};
+const interpolationSegmentCache = new WeakMap<
+  NUnit,
+  Map<number, InterpolationSegmentCacheEntry>
+>();
+
+function getInterpolationCache(unit: NUnit) {
+  let cache = interpolationSegmentCache.get(unit);
+  if (!cache) {
+    cache = new Map<number, InterpolationSegmentCacheEntry>();
+    interpolationSegmentCache.set(unit, cache);
+  }
+  return cache;
+}
+
+function findLastStateIndex(timestamps: number[], timestamp: number) {
+  let lo = 0;
+  let hi = timestamps.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (timestamps[mid] <= timestamp) {
+      ans = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return ans;
+}
+
+function mergeStateEntry(
+  base: CurrentState | null,
+  s: any,
+): CurrentState | null {
+  if (!base) {
+    const { diff, update, ...rest } = s;
+    return { ...rest } as CurrentState;
+  }
+
+  const { diff, update, ...rest } = s;
+  const next = { ...base, ...rest } as CurrentState;
+
+  if (update?.equipment && next.equipment) {
+    for (const e of update.equipment) {
+      const idx = next.equipment.findIndex((ee) => ee.id === e.id);
+      if (idx !== -1) next.equipment[idx] = { ...next.equipment[idx], ...e };
+    }
+  }
+
+  if (update?.personnel && next.personnel) {
+    for (const p of update.personnel) {
+      const idx = next.personnel.findIndex((pp) => pp.id === p.id);
+      if (idx !== -1) next.personnel[idx] = { ...next.personnel[idx], ...p };
+    }
+  }
+
+  if (update?.supplies && next.supplies) {
+    for (const p of update.supplies) {
+      const idx = next.supplies.findIndex((pp) => pp.id === p.id);
+      if (idx !== -1) next.supplies[idx] = { ...next.supplies[idx], ...p };
+    }
+  }
+
+  if (diff?.equipment && next.equipment) {
+    for (const e of diff.equipment) {
+      const idx = next.equipment.findIndex((ee) => ee.id === e.id);
+      if (idx !== -1) {
+        const eq = next.equipment[idx];
+        const onHand = (eq?.onHand ?? eq.count) + (e.onHand ?? 0);
+        next.equipment[idx] = { ...next.equipment[idx], onHand };
+      }
+    }
+  }
+
+  if (diff?.personnel && next.personnel) {
+    for (const p of diff.personnel) {
+      const idx = next.personnel.findIndex((pp) => pp.id === p.id);
+      if (idx !== -1) {
+        const pe = next.personnel[idx];
+        const onHand = (pe?.onHand ?? pe.count) + (p.onHand ?? 0);
+        next.personnel[idx] = { ...next.personnel[idx], onHand };
+      }
+    }
+  }
+
+  if (diff?.supplies && next.supplies) {
+    for (const p of diff.supplies) {
+      const idx = next.supplies.findIndex((pp) => pp.id === p.id);
+      if (idx !== -1) {
+        const pe = next.supplies[idx];
+        const onHand = (pe?.onHand ?? pe.count) + (p.onHand ?? 0);
+        next.supplies[idx] = { ...next.supplies[idx], onHand };
+      }
+    }
+  }
+
+  return next;
+}
+
+function getUnitStateCache(unit: NUnit): UnitStateCacheEntry {
+  const cached = unitStateCache.get(unit);
+  const unitStates = unit.state || [];
+  if (cached && cached.stateRef === unit.state && cached.timestamps.length === unitStates.length) {
+    return cached;
+  }
+
+  const timestamps: number[] = [];
+  const prefixStates: Array<CurrentState | null> = [];
+  let running = createInitialState(unit);
+
+  for (const s of unitStates) {
+    timestamps.push(s.t);
+    running = mergeStateEntry(running, s);
+    prefixStates.push(running);
+  }
+
+  const next = { stateRef: unit.state, timestamps, prefixStates };
+  unitStateCache.set(unit, next);
+  return next;
+}
+
+function getFeatureStateCache(feature: NScenarioFeature): FeatureStateCacheEntry {
+  const cached = featureStateCache.get(feature);
+  const featureStates = feature.state || [];
+  if (
+    cached &&
+    cached.stateRef === feature.state &&
+    cached.timestamps.length === featureStates.length
+  ) {
+    return cached;
+  }
+
+  const timestamps: number[] = [];
+  const prefixStates: Array<CurrentScenarioFeatureState | null> = [];
+  let running = createInitialFeatureState(feature);
+
+  for (const s of featureStates) {
+    timestamps.push(s.t);
+    running = { ...running, ...s };
+    prefixStates.push(running);
+  }
+
+  const next = { stateRef: feature.state, timestamps, prefixStates };
+  featureStateCache.set(feature, next);
+  return next;
+}
+
 export function updateCurrentUnitState(unit: NUnit, timestamp: number) {
   if (!unit.state || !unit.state.length) {
     if (!unit._state) {
@@ -127,109 +295,54 @@ export function updateCurrentUnitState(unit: NUnit, timestamp: number) {
     }
     return;
   }
-  let currentState = createInitialState(unit);
-  for (const s of unit.state) {
-    if (s.t <= timestamp) {
-      const { diff, update, ...rest } = s;
-      if (update?.equipment && currentState?.equipment) {
-        for (const e of update.equipment) {
-          const idx = currentState.equipment.findIndex((ee) => ee.id === e.id);
-          if (idx !== -1) {
-            currentState.equipment[idx] = { ...currentState.equipment[idx], ...e };
-          } else {
-            console.warn("Equipment not found", e);
-          }
-        }
-      }
-      if (update?.personnel && currentState?.personnel) {
-        for (const p of update.personnel) {
-          const idx = currentState.personnel.findIndex((pp) => pp.id === p.id);
-          if (idx !== -1) {
-            currentState.personnel[idx] = { ...currentState.personnel[idx], ...p };
-          } else {
-            console.warn("Personnel not found", p);
-          }
-        }
-      }
 
-      if (update?.supplies && currentState?.supplies) {
-        for (const p of update.supplies) {
-          const idx = currentState.supplies.findIndex((pp) => pp.id === p.id);
-          if (idx !== -1) {
-            currentState.supplies[idx] = { ...currentState.supplies[idx], ...p };
-          } else {
-            console.warn("Supplies not found", p);
-          }
-        }
-      }
+  const { timestamps, prefixStates } = getUnitStateCache(unit);
+  const idx = findLastStateIndex(timestamps, timestamp);
+  let currentState = idx >= 0 ? prefixStates[idx] : createInitialState(unit);
+  const nextState = idx + 1 < unit.state.length ? unit.state[idx + 1] : undefined;
 
-      if (diff?.equipment && currentState?.equipment) {
-        for (const e of diff.equipment) {
-          const idx = currentState.equipment.findIndex((ee) => ee.id === e.id);
-          if (idx !== -1) {
-            const eq = currentState.equipment[idx];
-            const onHand = (eq?.onHand ?? eq.count) + (e.onHand ?? 0);
-            currentState.equipment[idx] = { ...currentState.equipment[idx], onHand };
-          } else {
-            console.warn("Equipment not found", e);
-          }
-        }
-      }
-      if (diff?.personnel && currentState?.personnel) {
-        for (const p of diff.personnel) {
-          const idx = currentState.personnel.findIndex((pp) => pp.id === p.id);
-          if (idx !== -1) {
-            const pe = currentState.personnel[idx];
-            const onHand = (pe?.onHand ?? pe.count) + (p.onHand ?? 0);
-            currentState.personnel[idx] = { ...currentState.personnel[idx], onHand };
-          } else {
-            console.warn("Personnel not found", p);
-          }
-        }
-      }
+  if (
+    nextState &&
+    currentState?.location &&
+    nextState.location &&
+    !(nextState.interpolate === false) &&
+    (nextState.viaStartTime ?? -Infinity) <= timestamp
+  ) {
+    const nextStateIndex = idx + 1;
+    const startTime = nextState.viaStartTime ?? currentState.t;
+    const segmentSignature = `${currentState.location[0]},${currentState.location[1]}|${nextState.location[0]},${nextState.location[1]}|${(nextState.via || []).length}|${startTime}|${nextState.t}`;
 
-      if (diff?.supplies && currentState?.supplies) {
-        for (const p of diff.supplies) {
-          const idx = currentState.supplies.findIndex((pp) => pp.id === p.id);
-          if (idx !== -1) {
-            const pe = currentState.supplies[idx];
-            const onHand = (pe?.onHand ?? pe.count) + (p.onHand ?? 0);
-            currentState.supplies[idx] = { ...currentState.supplies[idx], onHand };
-          } else {
-            console.warn("Supplies not found", p);
-          }
-        }
-      }
-      currentState = { ...currentState, ...rest };
-    } else {
-      if (
-        currentState?.location &&
-        s.location &&
-        !(s.interpolate === false) &&
-        (s.viaStartTime ?? -Infinity) <= timestamp
-      ) {
-        const n = lineString(
-          s.via
-            ? [currentState.location, ...s.via, s.location]
-            : [currentState.location, s.location],
-        );
-        const timeDiff = s.t - (s.viaStartTime ?? currentState.t);
-        const pathLength = turfLength(n);
-        const averageSpeed = pathLength / timeDiff;
-        const p = turfAlong(
-          n,
-          averageSpeed * (timestamp - (s.viaStartTime ?? currentState.t)),
-        );
-        currentState = {
-          ...currentState,
-          t: timestamp,
-          location: p.geometry.coordinates,
-          type: "interpolated",
-        };
-      }
-      break;
+    const segmentCache = getInterpolationCache(unit);
+    let segment = segmentCache.get(nextStateIndex);
+    if (!segment || segment.signature !== segmentSignature) {
+      const line = lineString(
+        nextState.via
+          ? [currentState.location, ...nextState.via, nextState.location]
+          : [currentState.location, nextState.location],
+      );
+      const timeDiff = nextState.t - startTime;
+      const pathLength = turfLength(line);
+      segment = {
+        signature: segmentSignature,
+        line,
+        averageSpeed: timeDiff > 0 ? pathLength / timeDiff : 0,
+        startTime,
+      };
+      segmentCache.set(nextStateIndex, segment);
     }
+
+    const p = turfAlong(
+      segment.line,
+      segment.averageSpeed * (timestamp - segment.startTime),
+    );
+    currentState = {
+      ...currentState,
+      t: timestamp,
+      location: p.geometry.coordinates,
+      type: "interpolated",
+    };
   }
+
   if (currentState?.sidc !== unit._state?.sidc) {
     unit._ikey = undefined;
     invalidateUnitStyle(unit.id);
@@ -256,41 +369,41 @@ export function useScenarioTime(store: NewScenarioStore) {
   function setCurrentTime(timestamp: number) {
     update((s) => {
       // Update Units
-      Object.values(s.unitMap).forEach((unit) =>
-        updateCurrentUnitState(unit, timestamp),
-      );
+      for (const unitId in s.unitMap) {
+        const unit = s.unitMap[unitId];
+        if (unit) {
+          updateCurrentUnitState(unit, timestamp);
+        }
+      }
       
       // Update Layers
-      Object.values(s.layerMap).forEach((layer) => {
+      for (const layerId in s.layerMap) {
+        const layer = s.layerMap[layerId];
+        if (!layer) continue;
         const visibleFromT = layer.visibleFromT || Number.MIN_SAFE_INTEGER;
         const visibleUntilT = layer.visibleUntilT || Number.MAX_SAFE_INTEGER;
         layer._hidden = timestamp <= visibleFromT || timestamp >= visibleUntilT;
-        
-        // Update Features in Layer
-        layer.features.forEach((featureId) => {
-          const feature = s.featureMap[featureId];
-          if (!feature) return;
-          const featVisibleFromT = feature.meta.visibleFromT || Number.MIN_SAFE_INTEGER;
-          const featVisibleUntilT = feature.meta.visibleUntilT || Number.MAX_SAFE_INTEGER;
-          
-          feature._hidden =
-            timestamp <= featVisibleFromT ||
-            timestamp >= featVisibleUntilT ||
-            !!feature.meta.isHidden;
-          
-          if (feature.state?.length) {
-            let currentState = createInitialFeatureState(feature);
-            for (const st of feature.state) {
-              if (st.t <= timestamp) {
-                currentState = { ...currentState, ...st };
-              } else {
-                break;
-              }
-            }
-            feature._state = currentState;
-          }
-        });
-      });
+      }
+
+      // Update Features
+      for (const featureId in s.featureMap) {
+        const feature = s.featureMap[featureId];
+        if (!feature) continue;
+        const featVisibleFromT = feature.meta.visibleFromT || Number.MIN_SAFE_INTEGER;
+        const featVisibleUntilT = feature.meta.visibleUntilT || Number.MAX_SAFE_INTEGER;
+
+        feature._hidden =
+          timestamp <= featVisibleFromT ||
+          timestamp >= featVisibleUntilT ||
+          !!feature.meta.isHidden;
+
+        if (feature.state?.length) {
+          const { timestamps, prefixStates } = getFeatureStateCache(feature);
+          const idx = findLastStateIndex(timestamps, timestamp);
+          feature._state = idx >= 0 ? prefixStates[idx] : createInitialFeatureState(feature);
+        }
+      }
+
       s.currentTime = timestamp;
     }, { label: "setCurrentTime" }); // Optional: omit label to avoid filling undo stack with time scrubbing
   }

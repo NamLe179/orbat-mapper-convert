@@ -13,6 +13,10 @@ import { utcFormat } from "d3-time-format";
 import { interpolateOranges } from "d3-scale-chromatic";
 import { scaleSequential } from "d3-scale";
 import { throttle } from "lodash";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import { useStore } from "zustand";
 
 // Project Imports
 import { useActiveScenario } from "@/hooks/scenarioUtils";
@@ -24,6 +28,9 @@ import { cn } from "@/lib/utils";
 
 // --- Constants ---
 const MS_PER_HOUR = 3600 * 1000;
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 // --- Helper Hook: useElementSize ---
 function useElementSize<T extends HTMLElement = HTMLDivElement>() {
@@ -79,13 +86,21 @@ export default function ScenarioTimeline() {
   } = useActiveScenario();
   
   const fmt = useTimeFormatStore();
-  const { activeScenarioEventId, setActiveScenarioEventId } = useSelectedItems();
+  const { setActiveScenarioEventId } = useSelectedItems();
+  const currentScenarioTimestamp = useStore(store._store, (s) => s.currentTime);
+  const currentScenarioDayAnchor = useStore(
+    store._store,
+    (s) => +utcDay.floor(new Date(s.currentTime)),
+  );
+  const unitStateCounter = useStore(store._store, (s) => s.unitStateCounter);
+  const featureStateCounter = useStore(store._store, (s) => s.featureStateCounter);
+  const events = useStore(store._store, (s) => s.events);
+  const eventMap = useStore(store._store, (s) => s.eventMap);
 
   // --- Element & Size ---
   const { ref: elRef, width } = useElementSize();
 
   // --- Local State ---
-  const [isPointerInteraction, setIsPointerInteraction] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedDiff, setDraggedDiff] = useState(0);
   const [majorWidth, setMajorWidth] = useState(100);
@@ -98,23 +113,18 @@ export default function ScenarioTimeline() {
 
   // --- Derived State (Computed) ---
   
-  const currentScenarioTimestamp = store.state.currentTime;
-  const scenarioTime = useMemo(() => {
-    const dayjs = require('dayjs');
-    const utc = require('dayjs/plugin/utc');
-    const timezone = require('dayjs/plugin/timezone');
-    dayjs.extend(utc);
-    dayjs.extend(timezone);
-    return dayjs(currentScenarioTimestamp).tz(timeZone || 'UTC');
-  }, [currentScenarioTimestamp, timeZone]);
+  const scenarioTime = useMemo(
+    () => dayjs(currentScenarioTimestamp).tz(timeZone || "UTC"),
+    [currentScenarioTimestamp, timeZone],
+  );
   const tzOffset = useMemo(() => scenarioTime.utcOffset(), [scenarioTime]);
 
   // Histogram Data (Compute on updates)
   const { histogram, max: maxCount } = useMemo(() => {
-    // Dependency vào unitStateCounter/featureStateCounter để trigger recalculate
-    const _trigger = store.state.unitStateCounter + store.state.featureStateCounter;
+    // Trigger histogram re-calc only when state counters change.
+    const _trigger = unitStateCounter + featureStateCounter;
     return computeTimeHistogram();
-  }, [store.state.unitStateCounter, store.state.featureStateCounter, computeTimeHistogram]);
+  }, [unitStateCounter, featureStateCounter, computeTimeHistogram]);
 
   const countColor = useMemo(
     () => scaleSequential(interpolateOranges).domain([1, maxCount]),
@@ -132,42 +142,18 @@ export default function ScenarioTimeline() {
 
   const minorWidth = majorWidth / (24 / minorStep);
 
-  // --- Core Calculation: Ticks ---
-  // Tính toán Ticks dựa trên centerTime hiện tại và width container
-  // React Strategy: Tính toán trực tiếp trong render/memo thay vì watchEffect update state riêng lẻ
-  const timelineCalculations = useMemo(() => {
+  // --- Core Calculation: Tick/Grid Geometry ---
+  const timelineGrid = useMemo(() => {
     if (!width) return { 
         majorTicks: [], 
         minorTicks: [], 
-        eventsWithX: [], 
-        binsWithX: [], 
         timelineWidth: 0, 
-        totalXOffset: 0,
-        minDate: new Date(),
-        maxDate: new Date(),
-        centerTimeStamp: 0
+        startTs: 0,
+        endTs: 0,
     };
 
-    // 1. Calculate Center & Offset
-    // Nếu đang drag, offset sẽ được cộng thêm draggedDiff. 
-    // Tuy nhiên, logic Vue gốc dùng xOffset tĩnh + draggedDiff động.
-    
-    // Tính toán lại xOffset chuẩn dựa trên currentTime (nếu không drag)
-    const tt = new Date(currentScenarioTimestamp);
-    
-    // Công thức từ Vue:
-    // (Total Minutes + Offset + Seconds) * (Pixels Per Minute) * -1
-    const pixelsPerMinute = majorWidth / (24 * 60);
-    const timeInMinutes = tt.getUTCHours() * 60 + tt.getUTCMinutes() + tzOffset + tt.getUTCSeconds() / 60;
-    
-    const calculatedXOffset = timeInMinutes * pixelsPerMinute * -1;
-    
-    // Trong React, ta dùng giá trị này làm base, cộng thêm drag
-    const totalXOffset = calculatedXOffset + draggedDiff;
-
-    // 2. Generate Ticks
-    // Dùng chính thời gian hiện tại làm center để tạo ticks xung quanh
-    const centerTime = new Date(currentScenarioTimestamp);
+    // Keep grid stable while currentTime moves within the same UTC day.
+    const centerTime = new Date(currentScenarioDayAnchor);
     const dayPadding = Math.ceil((width * 2) / majorWidth);
     const currentUtcDay = utcDay.floor(centerTime);
     const start = utcDay.offset(currentUtcDay, -dayPadding);
@@ -186,59 +172,58 @@ export default function ScenarioTimeline() {
       timestamp: +d,
     }));
 
-    // 3. Map Events & Histogram to X coordinates
-    const minTs = +start;
-    const maxTs = +end;
-    const msPerPixel = majorWidth / (MS_PER_HOUR * 24);
-
-    const eventsList = store.state.events.map((id: string) => store.state.eventMap[id]);
-    
-    const eventsWithX = eventsList
-      .filter((e: any) => e.startTime >= minTs && e.startTime <= maxTs)
-      .map((event: any) => ({
-        x: (event.startTime - minTs + tzOffset * 60 * 1000) * msPerPixel,
-        event,
-      }));
-
-    const binsWithX = histogram
-      .filter((bin) => bin.t >= minTs && bin.t <= maxTs)
-      .map((bin) => ({
-        x: (bin.t - minTs + tzOffset * 60 * 1000) * msPerPixel,
-        count: bin.count,
-      }));
-
     return {
       majorTicks,
       minorTicks,
-      eventsWithX,
-      binsWithX,
       timelineWidth: majorTicks.length * majorWidth,
-      totalXOffset,
-      minDate: start,
-      maxDate: end,
-      centerTimeStamp: currentScenarioTimestamp
+      startTs: +start,
+      endTs: +end,
     };
   }, [
-    width, 
-    majorWidth, 
-    minorStep, 
-    currentScenarioTimestamp, 
-    tzOffset, 
-    store.state.events, 
-    store.state.eventMap, 
-    histogram, 
-    draggedDiff
+    width,
+    majorWidth,
+    minorStep,
+    currentScenarioDayAnchor,
   ]);
 
-  const { 
-      majorTicks, 
-      minorTicks, 
-      eventsWithX, 
-      binsWithX, 
-      timelineWidth, 
-      totalXOffset,
-      centerTimeStamp // Snapshot thời điểm render để tính ngược tọa độ drag
-  } = timelineCalculations;
+  const eventsWithX = useMemo(() => {
+    const { startTs, endTs } = timelineGrid;
+    if (!startTs && !endTs) return [];
+
+    const msPerPixel = majorWidth / (MS_PER_HOUR * 24);
+    return events
+      .map((id: string) => eventMap[id])
+      .filter((e: any) => e && e.startTime >= startTs && e.startTime <= endTs)
+      .map((event: any) => ({
+        x: (event.startTime - startTs + tzOffset * 60 * 1000) * msPerPixel,
+        event,
+      }));
+  }, [timelineGrid, majorWidth, events, eventMap, tzOffset]);
+
+  const binsWithX = useMemo(() => {
+    const { startTs, endTs } = timelineGrid;
+    if (!startTs && !endTs) return [];
+
+    const msPerPixel = majorWidth / (MS_PER_HOUR * 24);
+    return histogram
+      .filter((bin) => bin.t >= startTs && bin.t <= endTs)
+      .map((bin) => ({
+        x: (bin.t - startTs + tzOffset * 60 * 1000) * msPerPixel,
+        count: bin.count,
+      }));
+  }, [timelineGrid, majorWidth, histogram, tzOffset]);
+
+  const totalXOffset = useMemo(() => {
+    if (!width) return 0;
+    const tt = new Date(currentScenarioTimestamp);
+    const pixelsPerMinute = majorWidth / (24 * 60);
+    const timeInMinutes =
+      tt.getUTCHours() * 60 + tt.getUTCMinutes() + tzOffset + tt.getUTCSeconds() / 60;
+    const calculatedXOffset = timeInMinutes * pixelsPerMinute * -1;
+    return calculatedXOffset + draggedDiff;
+  }, [width, currentScenarioTimestamp, majorWidth, tzOffset, draggedDiff]);
+
+  const { majorTicks, minorTicks, timelineWidth } = timelineGrid;
 
   // --- Interaction Logic ---
 
@@ -248,16 +233,14 @@ export default function ScenarioTimeline() {
     const center = width / 2;
     const msPerPixel = (MS_PER_HOUR * 24) / majorWidth;
     
-    // Vue logic uses centerTimeStamp ref which updates on render. 
-    // Here use the one from calculation or current
-    const baseTime = centerTimeStamp; 
+    const baseTime = currentScenarioTimestamp;
     
     const diff = x - center;
     const newDateTs = baseTime + diff * msPerPixel;
     const date = new Date(newDateTs);
     date.setUTCSeconds(0, 0);
     return { date, diff };
-  }, [width, majorWidth, centerTimeStamp]);
+  }, [width, majorWidth, currentScenarioTimestamp]);
 
   // Throttled Time Update
   const throttledSetCurrentTime = useCallback(
@@ -271,18 +254,20 @@ export default function ScenarioTimeline() {
   const isPointerInteractionRef = useRef(false);
 
   const onPointerDown = (evt: React.PointerEvent) => {
+    // Keep right-click free for Radix ContextMenu trigger.
+    if (evt.button === 2) return;
+
     const el = elRef.current;
     if (!el) return;
 
     throttledSetCurrentTime.cancel();
     
     dragRef.current.startX = evt.clientX;
-    dragRef.current.startTimestamp = scenarioTime.valueOf();
+    dragRef.current.startTimestamp = currentScenarioTimestamp;
     dragRef.current.didDrag = false;
     
     el.setPointerCapture(evt.pointerId);
     isPointerInteractionRef.current = true;
-    setIsPointerInteraction(true);
     setIsDragging(false);
     setAnimate(false); // Disable transition during drag
   };
@@ -306,6 +291,8 @@ export default function ScenarioTimeline() {
   };
 
   const onPointerUp = (evt: React.PointerEvent) => {
+    if (!isPointerInteractionRef.current) return;
+
     const el = elRef.current;
     if (el?.hasPointerCapture(evt.pointerId)) {
       el.releasePointerCapture(evt.pointerId);
@@ -336,12 +323,13 @@ export default function ScenarioTimeline() {
     }
 
     isPointerInteractionRef.current = false;
-    setIsPointerInteraction(false);
     setIsDragging(false);
     dragRef.current.didDrag = false;
   };
 
   const onPointerCancel = (evt: React.PointerEvent) => {
+    if (!isPointerInteractionRef.current) return;
+
     const el = elRef.current;
     if (el?.hasPointerCapture(evt.pointerId)) {
       el.releasePointerCapture(evt.pointerId);
@@ -351,7 +339,6 @@ export default function ScenarioTimeline() {
     setAnimate(false);
     setDraggedDiff(0);
     isPointerInteractionRef.current = false;
-    setIsPointerInteraction(false);
     setIsDragging(false);
     dragRef.current.didDrag = false;
   };

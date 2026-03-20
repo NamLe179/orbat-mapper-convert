@@ -28,20 +28,10 @@ export default function TimelineContextMenu({
   onAction,
   children,
 }: TimelineContextMenuProps) {
-  const uiStore = useUiStore();
+  const setShowTimeline = useUiStore((s) => s.setShowTimeline);
 
-  // Hàm helper để xử lý logic update store
-  // Giả định uiStore trong React (Zustand) có method setShowTimeline hoặc tương tự.
-  // Nếu store của bạn là Mutable (như Valtio), bạn có thể gán trực tiếp: uiStore.showTimeline = false
   const hideTimeline = () => {
-    if ('setShowTimeline' in uiStore) {
-        // @ts-ignore
-        uiStore.setShowTimeline(false);
-    } else {
-        // Fallback cho mutable store
-        // @ts-ignore
-        uiStore.showTimeline = false;
-    }
+    setShowTimeline(false);
   };
 
   return (

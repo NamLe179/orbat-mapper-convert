@@ -59,7 +59,14 @@ export default function ScenarioEditorMap({
   const [selectInteraction, setSelectInteraction] = useState<Select | null>(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const playbackRef = useRef(playback);
+  const scnRef = useRef(scn);
   const { getModalTimestamp } = useTimeModal();
+
+  useEffect(() => {
+    playbackRef.current = playback;
+    scnRef.current = scn;
+  });
   
   // Handler for opening settings panel
   const handleShowSettings = useCallback(() => {
@@ -100,25 +107,28 @@ export default function ScenarioEditorMap({
 
   // --- Playback Loop (useRafFn replacement) ---
   const updatePlayback = useCallback(() => {
-    if (!playback.playbackRunning) return;
+    const pb = playbackRef.current;
+    const scenario = scnRef.current;
+
+    if (!pb.playbackRunning) return;
 
     if (
-      playback.playbackLooping &&
-      playback.endMarker !== undefined &&
-      playback.startMarker !== undefined
+      pb.playbackLooping &&
+      pb.endMarker !== undefined &&
+      pb.startMarker !== undefined
     ) {
-      if (scn.store.state.currentTime >= playback.endMarker) {
-        scn.time.setCurrentTime(playback.startMarker);
+      if (scenario.store.state.currentTime >= pb.endMarker) {
+        scenario.time.setCurrentTime(pb.startMarker);
         rafRef.current = requestAnimationFrame(updatePlayback);
         return;
       }
     }
 
-    const newTime = scn.store.state.currentTime + playback.playbackSpeed;
-    scn.time.setCurrentTime(newTime);
+    const newTime = scenario.store.state.currentTime + pb.playbackSpeed;
+    scenario.time.setCurrentTime(newTime);
 
     rafRef.current = requestAnimationFrame(updatePlayback);
-  }, [playback, scn]);
+  }, []);
 
   useEffect(() => {
     if (playback.playbackRunning) {
@@ -129,7 +139,7 @@ export default function ScenarioEditorMap({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [playback.playbackRunning, updatePlayback]);
+  }, [playback.playbackRunning]);
 
   // --- Cleanup ---
   useEffect(() => {

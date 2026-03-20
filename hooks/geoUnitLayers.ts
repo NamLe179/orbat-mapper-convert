@@ -228,14 +228,33 @@ export function useUnitLayer(olMap: OLMap | null) {
   const drawUnits = useCallback(() => {
     const source = unitLayer.getSource();
     if (!source) return;
-    
-    source.clear();
-    // geo.everyVisibleUnit is a value (getter) or array
-    // Assuming geo.everyVisibleUnit is an array in React context version
-    const units = geo.everyVisibleUnit.map((unit) => {
-      return createUnitFeatureAt(unit._state!.location!, unit);
+
+    const seen = new Set<string>();
+
+    for (const unit of geo.everyVisibleUnit) {
+      if (!unit._state?.location) continue;
+
+      const unitId = unit.id;
+      seen.add(unitId);
+
+      const existing = source.getFeatureById(unitId);
+      if (existing) {
+        const geom = existing.getGeometry();
+        if (geom instanceof Point) {
+          geom.setCoordinates(fromLonLat(unit._state.location));
+        }
+      } else {
+        source.addFeature(createUnitFeatureAt(unit._state.location, unit));
+      }
+    }
+
+    // Remove units that are no longer visible at this timestamp.
+    source.getFeatures().forEach((feature) => {
+      const id = feature.getId();
+      if (typeof id === "string" && !seen.has(id)) {
+        source.removeFeature(feature);
+      }
     });
-    source.addFeatures(units);
   }, [unitLayer, geo.everyVisibleUnit]);
 
   // Initial Draw & Add to Map
