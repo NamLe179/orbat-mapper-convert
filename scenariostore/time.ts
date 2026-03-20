@@ -79,6 +79,9 @@ export type GoToScenarioEventEvent = {
   event: NScenarioEvent;
 };
 
+const TIME_DERIVED_STATE_LABEL = "setTimeDerivedState";
+const TIME_SCRUB_LABEL = "setCurrentTime:scrub";
+
 // --- Helpers ---
 
 /**
@@ -367,6 +370,8 @@ export function useScenarioTime(store: NewScenarioStore) {
   const goToScenarioEventHook = createEventHook<GoToScenarioEventEvent>();
 
   function setCurrentTime(timestamp: number) {
+    if (store.state.currentTime === timestamp) return;
+
     update((s) => {
       // Update Units
       for (const unitId in s.unitMap) {
@@ -403,9 +408,11 @@ export function useScenarioTime(store: NewScenarioStore) {
           feature._state = idx >= 0 ? prefixStates[idx] : createInitialFeatureState(feature);
         }
       }
+    }, { label: TIME_DERIVED_STATE_LABEL });
 
+    update((s) => {
       s.currentTime = timestamp;
-    }, { label: "setCurrentTime" }); // Optional: omit label to avoid filling undo stack with time scrubbing
+    }, { label: TIME_SCRUB_LABEL });
   }
 
   function add(amount: number, unit: ManipulateType, normalize = false) {

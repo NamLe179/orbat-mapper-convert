@@ -17,6 +17,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { useStore } from "zustand";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 
 // Project Imports
 import { useActiveScenario } from "@/hooks/scenarioUtils";
@@ -87,7 +88,11 @@ export default function ScenarioTimeline() {
   
   const fmt = useTimeFormatStore();
   const { setActiveScenarioEventId } = useSelectedItems();
-  const currentScenarioTimestamp = useStore(store._store, (s) => s.currentTime);
+  const currentScenarioTimestamp = useStoreWithEqualityFn(
+    store._store,
+    (s) => s.currentTime,
+    Object.is,
+  );
   const currentScenarioDayAnchor = useStore(
     store._store,
     (s) => +utcDay.floor(new Date(s.currentTime)),
@@ -101,8 +106,9 @@ export default function ScenarioTimeline() {
   const { ref: elRef, width } = useElementSize();
 
   // --- Local State ---
-  const [isDragging, setIsDragging] = useState(false);
-  const [draggedDiff, setDraggedDiff] = useState(0);
+  const [isDraggingUi, setIsDraggingUi] = useState(false);
+  const [jumpOffset, setJumpOffset] = useState(0);
+  const [previewTimestamp, setPreviewTimestamp] = useState<number | null>(null);
   const [majorWidth, setMajorWidth] = useState(100);
   
   const [hoveredX, setHoveredX] = useState(0);
@@ -213,15 +219,18 @@ export default function ScenarioTimeline() {
       }));
   }, [timelineGrid, majorWidth, histogram, tzOffset]);
 
-  const totalXOffset = useMemo(() => {
+  const displayTimestamp = previewTimestamp ?? currentScenarioTimestamp;
+
+  const baseXOffset = useMemo(() => {
     if (!width) return 0;
-    const tt = new Date(currentScenarioTimestamp);
+    const tt = new Date(displayTimestamp);
     const pixelsPerMinute = majorWidth / (24 * 60);
     const timeInMinutes =
       tt.getUTCHours() * 60 + tt.getUTCMinutes() + tzOffset + tt.getUTCSeconds() / 60;
-    const calculatedXOffset = timeInMinutes * pixelsPerMinute * -1;
-    return calculatedXOffset + draggedDiff;
-  }, [width, currentScenarioTimestamp, majorWidth, tzOffset, draggedDiff]);
+    return timeInMinutes * pixelsPerMinute * -1;
+  }, [width, displayTimestamp, majorWidth, tzOffset]);
+
+  const totalXOffset = baseXOffset + jumpOffset;
 
   const { majorTicks, minorTicks, timelineWidth } = timelineGrid;
 
@@ -250,7 +259,12 @@ export default function ScenarioTimeline() {
     [setCurrentTime]
   );
 
-  const dragRef = useRef({ startX: 0, startTimestamp: 0, didDrag: false });
+  const dragStateRef = useRef({
+    isDragging: false,
+    startX: 0,
+    startTimestamp: 0,
+    didDrag: false,
+  });
   const isPointerInteractionRef = useRef(false);
 
   const onPointerDown = (evt: React.PointerEvent) => {
@@ -262,30 +276,35 @@ export default function ScenarioTimeline() {
 
     throttledSetCurrentTime.cancel();
     
-    dragRef.current.startX = evt.clientX;
-    dragRef.current.startTimestamp = currentScenarioTimestamp;
-    dragRef.current.didDrag = false;
+    dragStateRef.current.startX = evt.clientX;
+    dragStateRef.current.startTimestamp = currentScenarioTimestamp;
+    dragStateRef.current.didDrag = false;
+    dragStateRef.current.isDragging = false;
+    setPreviewTimestamp(currentScenarioTimestamp);
+    setJumpOffset(0);
     
     el.setPointerCapture(evt.pointerId);
     isPointerInteractionRef.current = true;
-    setIsDragging(false);
+    setIsDraggingUi(false);
     setAnimate(false); // Disable transition during drag
   };
 
   const onPointerMove = (evt: React.PointerEvent) => {
     if (isPointerInteractionRef.current) {
-      const diff = evt.clientX - dragRef.current.startX;
+      const diff = evt.clientX - dragStateRef.current.startX;
 
-      if (Math.abs(diff) < 5) {
-        setIsDragging(false);
+      if (!dragStateRef.current.didDrag && Math.abs(diff) < 5) {
+        setIsDraggingUi(false);
         return;
       } else {
-        dragRef.current.didDrag = true;
-        setIsDragging(true);
+        dragStateRef.current.didDrag = true;
+        dragStateRef.current.isDragging = true;
+        setIsDraggingUi(true);
       }
 
       const msPerPixel = (MS_PER_HOUR * 24) / majorWidth;
-      const newTs = Math.floor(dragRef.current.startTimestamp - diff * msPerPixel);
+      const newTs = Math.floor(dragStateRef.current.startTimestamp - diff * msPerPixel);
+      setPreviewTimestamp(newTs);
       throttledSetCurrentTime(newTs);
     }
   };
@@ -298,33 +317,36 @@ export default function ScenarioTimeline() {
       el.releasePointerCapture(evt.pointerId);
     }
 
-    const finalDiff = evt.clientX - dragRef.current.startX;
-    const didDrag = dragRef.current.didDrag || Math.abs(finalDiff) >= 5;
+    const finalDiff = evt.clientX - dragStateRef.current.startX;
+    const didDrag = dragStateRef.current.didDrag || Math.abs(finalDiff) >= 5;
 
     if (!didDrag && evt.button !== 2) {
       // Click interaction (Jump to time)
       const { date, diff } = calculatePixelDate(evt.clientX);
       
       setAnimate(true); // Enable transition for jump
-      setDraggedDiff(-diff); // Visual offset adjustment
+      setPreviewTimestamp(null);
+      setJumpOffset(-diff); // Visual offset adjustment
 
       // Round to nearest 15 mins
       date.setUTCMinutes(Math.round(date.getUTCMinutes() / 15) * 15);
       setCurrentTime(date.valueOf());
     } else {
         const msPerPixel = (MS_PER_HOUR * 24) / majorWidth;
-        const finalTs = Math.floor(dragRef.current.startTimestamp - finalDiff * msPerPixel);
+        const finalTs = Math.floor(dragStateRef.current.startTimestamp - finalDiff * msPerPixel);
 
         throttledSetCurrentTime.cancel();
         setCurrentTime(finalTs);
 
         setAnimate(false);
-        setDraggedDiff(0);
+        setPreviewTimestamp(finalTs);
+        setJumpOffset(0);
     }
 
     isPointerInteractionRef.current = false;
-    setIsDragging(false);
-    dragRef.current.didDrag = false;
+    setIsDraggingUi(false);
+    dragStateRef.current.isDragging = false;
+    dragStateRef.current.didDrag = false;
   };
 
   const onPointerCancel = (evt: React.PointerEvent) => {
@@ -337,10 +359,12 @@ export default function ScenarioTimeline() {
 
     throttledSetCurrentTime.cancel();
     setAnimate(false);
-    setDraggedDiff(0);
+    setPreviewTimestamp(null);
+    setJumpOffset(0);
     isPointerInteractionRef.current = false;
-    setIsDragging(false);
-    dragRef.current.didDrag = false;
+    setIsDraggingUi(false);
+    dragStateRef.current.isDragging = false;
+    dragStateRef.current.didDrag = false;
   };
 
   // Reset Animation after jump
@@ -348,7 +372,7 @@ export default function ScenarioTimeline() {
     if (animate) {
       const timer = setTimeout(() => {
         setAnimate(false);
-        setDraggedDiff(0);
+        setJumpOffset(0);
       }, 100);
       return () => clearTimeout(timer);
     }
@@ -359,6 +383,12 @@ export default function ScenarioTimeline() {
       throttledSetCurrentTime.cancel();
     };
   }, [throttledSetCurrentTime]);
+
+  useEffect(() => {
+    if (!isDraggingUi && previewTimestamp !== null && previewTimestamp === currentScenarioTimestamp) {
+      setPreviewTimestamp(null);
+    }
+  }, [isDraggingUi, previewTimestamp, currentScenarioTimestamp]);
 
   const onHover = (e: React.MouseEvent) => {
     const { date } = calculatePixelDate(e.clientX);
@@ -500,7 +530,7 @@ export default function ScenarioTimeline() {
           </div>
 
           {/* Hover Marker */}
-          {showHoverMarker && !isDragging && (
+          {showHoverMarker && !isDraggingUi && (
             <p className="absolute top-0 right-1 hidden p-0 text-xs text-red-900 select-none sm:block dark:text-red-600">
               {formattedHoveredDate}
             </p>

@@ -44,6 +44,8 @@ import MainViewSlideOver from "@/components/MainViewSlideOver";
 import OLMap from "ol/Map";
 import Select from "ol/interaction/Select";
 
+const FRAME_INTERVAL = 1000 / 60;
+
 export default function ScenarioEditorMap({ 
   onShowSettings 
 }: { onShowSettings?: () => void }) {
@@ -59,6 +61,7 @@ export default function ScenarioEditorMap({
   const [selectInteraction, setSelectInteraction] = useState<Select | null>(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const rafRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef(0);
   const playbackRef = useRef(playback);
   const scnRef = useRef(scn);
   const { getModalTimestamp } = useTimeModal();
@@ -112,6 +115,13 @@ export default function ScenarioEditorMap({
 
     if (!pb.playbackRunning) return;
 
+    const now = performance.now();
+    if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
+      rafRef.current = requestAnimationFrame(updatePlayback);
+      return;
+    }
+    lastFrameTimeRef.current = now;
+
     if (
       pb.playbackLooping &&
       pb.endMarker !== undefined &&
@@ -132,6 +142,7 @@ export default function ScenarioEditorMap({
 
   useEffect(() => {
     if (playback.playbackRunning) {
+      lastFrameTimeRef.current = 0;
       rafRef.current = requestAnimationFrame(updatePlayback);
     } else {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
