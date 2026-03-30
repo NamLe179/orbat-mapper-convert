@@ -22,9 +22,9 @@
  * - PUT    /api/scenarios/:scenarioId/units/:unitId/state     - Update unit state
  */
 
-import { useMemo } from "react";
-import type { NewScenarioStore } from "@/scenariostore/newScenarioStore";
-import { useScenarioState } from "@/scenariostore/useScenarioState";
+import { useEffect, useMemo, useRef } from "react";
+import type { NewScenarioStore, ScenarioState } from "@/scenariostore/newScenarioStore";
+import { useScenarioStateSelector } from "@/scenariostore/useScenarioState";
 import type { CurrentState } from "@/types/scenarioModels";
 import type {
   CurrentScenarioFeatureState,
@@ -49,7 +49,6 @@ import type { Geometry } from "geojson";
 import { updateCurrentUnitState } from "@/scenariostore/time";
 import {
   featureRuntimeState,
-  getFeatureRuntimeState,
   getUnitRuntimeState,
 } from "@/scenariostore/runtimeState";
 
@@ -203,11 +202,75 @@ function createInitialFeatureState(
 // --- Main Hook ---
 
 export function useGeo(store: NewScenarioStore | null) {
-  const state = useScenarioState(store);
   const { update } = store || {};
-  
-  // Guard: Return empty/no-op implementation if state is not ready
-  const isReady = !!state;
+
+  const structureVersion = useScenarioStateSelector(
+    store,
+    (s) => {
+      const layersOrder = s.layers.join("|");
+      const mapLayersOrder = s.mapLayers.join("|");
+      const layerNames = s.layers.map((id) => s.layerMap[id]?.name || "").join("|");
+      const mapLayerNames = s.mapLayers
+        .map((id) => s.mapLayerMap[id]?.name || "")
+        .join("|");
+      const layerFeatureCounts = s.layers
+        .map((id) => `${id}:${s.layerMap[id]?.features.length || 0}`)
+        .join("|");
+      return `${layersOrder}#${mapLayersOrder}#${layerNames}#${mapLayerNames}#${layerFeatureCounts}`;
+    },
+    Object.is,
+  );
+
+  const getState = () => store?.state ?? null;
+
+  const computeVisibleUnits = (scenarioState: ScenarioState | null) => {
+    if (!scenarioState) return [];
+
+    const hiddenGroupIds = new Set(
+      Object.values(scenarioState.sideGroupMap)
+        .filter(
+          (group) => !!(group.isHidden || scenarioState.sideMap[group._pid]?.isHidden),
+        )
+        .map((group) => group.id),
+    );
+    const hiddenSideIds = new Set(
+      Object.values(scenarioState.sideMap)
+        .filter((side) => !!side.isHidden)
+        .map((side) => side.id),
+    );
+
+    return Object.values(scenarioState.unitMap).filter(
+      (unit) =>
+        !(unit._gid ? hiddenGroupIds.has(unit._gid) : hiddenSideIds.has(unit._sid)) &&
+        getUnitRuntimeState(unit.id)?.location,
+    );
+  };
+
+  const everyVisibleUnitRef = useRef<ReturnType<typeof computeVisibleUnits>>([]);
+
+  useEffect(() => {
+    if (!store) {
+      everyVisibleUnitRef.current = [];
+      return;
+    }
+
+    const recompute = () => {
+      everyVisibleUnitRef.current = computeVisibleUnits(store.state);
+    };
+
+    recompute();
+
+    const unsubscribers = [
+      store._store.subscribe((s) => s.unitStateCounter, recompute),
+      store._store.subscribe((s) => s.unitMap, recompute),
+      store._store.subscribe((s) => s.sideMap, recompute),
+      store._store.subscribe((s) => s.sideGroupMap, recompute),
+    ];
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [store]);
   
   // Use constant references for event hooks so they persist across renders
   const mapLayerEvent = useMemo(() => createEventHook<ScenarioMapLayerEvent>(), []);
@@ -215,61 +278,37 @@ export function useGeo(store: NewScenarioStore | null) {
 
   // --- Computed / Memos ---
 
-  const hiddenGroups = useMemo(() => {
-    if (!isReady) return new Set<string>();
-    return new Set(
-      Object.values(state.sideGroupMap)
-        .filter((group) => !!(group.isHidden || state.sideMap[group._pid]?.isHidden))
-        .map((group) => group.id),
-    );
-  }, [isReady, state?.sideGroupMap, state?.sideMap]);
-
-  const hiddenSides = useMemo(() => {
-    if (!isReady) return new Set<string>();
-    return new Set(
-      Object.values(state.sideMap)
-        .filter((side) => !!side.isHidden)
-        .map((side) => side.id),
-    );
-  }, [isReady, state?.sideMap]);
-
-  const everyVisibleUnit = useMemo(() => {
-    if (!isReady) return [];
-    return Object.values(state.unitMap).filter(
-      (unit) =>
-        !(unit._gid
-          ? hiddenGroups.has(unit._gid)
-          : hiddenSides.has(unit._sid)) && getUnitRuntimeState(unit.id)?.location,
-    );
-  }, [isReady, state?.unitMap, hiddenGroups, hiddenSides, state?.unitStateCounter]);
-
   const layers = useMemo(() => {
-    if (!isReady) return [];
+    const state = getState();
+    if (!state) return [];
     return state.layers
       .map((layerId) => state.layerMap[layerId])
       .map((layer) => ({
         ...layer,
         features: layer.features.map((featureId) => state.featureMap[featureId]),
       }));
-  }, [isReady, state?.layers, state?.layerMap, state?.featureMap]);
+  }, [store, structureVersion]);
 
   const mapLayers = useMemo(() => {
-    if (!isReady) return [];
+    const state = getState();
+    if (!state) return [];
     return state.mapLayers.map((layerId) => state.mapLayerMap[layerId]);
-  }, [isReady, state?.mapLayers, state?.mapLayerMap]);
+  }, [store, structureVersion]);
 
   const layersFeatures = useMemo(() => {
-    if (!isReady) return [];
+    const state = getState();
+    if (!state) return [];
     return state.layers
       .map((layerId) => state.layerMap[layerId])
       .map((layer) => ({
         layer,
         features: layer.features.map((featureId) => state.featureMap[featureId]),
       }));
-  }, [isReady, state?.layers, state?.layerMap, state?.featureMap]);
+  }, [store, structureVersion]);
 
   const itemsInfo = useMemo<LayerFeatureItem[]>(() => {
-    if (!isReady) return [];
+    const state = getState();
+    if (!state) return [];
     let items: LayerFeatureItem[] = [];
     layers.forEach((layer) => {
       items.push({ id: layer.id, type: "layer", name: layer.name });
@@ -286,7 +325,7 @@ export function useGeo(store: NewScenarioStore | null) {
       items.push(...mappedFeatures);
     });
     return items;
-  }, [layers]);
+  }, [layers, store, structureVersion]);
 
   // --- Actions ---
 
@@ -316,12 +355,13 @@ export function useGeo(store: NewScenarioStore | null) {
       },
       { label: "addUnitPosition", value: unitId },
     );
-    // Update the unit's _state to reflect the new position
+    const currentState = getState();
+    const unit = currentState?.unitMap[unitId];
+    if (unit && currentState) {
+      updateCurrentUnitState(unit, currentState.currentTime);
+    }
+
     update((s) => {
-      const unit = s.unitMap[unitId];
-      if (!unit) return;
-      const timestamp = s.currentTime;
-      updateCurrentUnitState(unit, timestamp);
       s.unitStateCounter++;
     });
   }
@@ -397,6 +437,7 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   function moveLayer(layerId: FeatureId, toIndex: number) {
+    const state = getState();
     if (!state || !update) return;
     const fromIndex = state.layers.indexOf(layerId);
     update(
@@ -409,6 +450,7 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   function moveMapLayer(layerId: FeatureId, options: MoveLayerOptions) {
+    const state = getState();
     if (!state || !update) return;
     const fromIndex = state.mapLayers.indexOf(layerId);
     const toIndex =
@@ -423,8 +465,10 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   function moveFeature(featureId: FeatureId, toIndex: number) {
+    const state = getState();
     if (!state || !update) return;
     const feature = state.featureMap[featureId];
+    if (!feature) return;
 
     update(
       (s) => {
@@ -446,6 +490,7 @@ export function useGeo(store: NewScenarioStore | null) {
     destinationFeatureOrLayerId: FeatureId,
     target: DropTarget,
   ) {
+    const state = getState();
     if (!state) return;
     const feature = state.featureMap[featureId];
     const destinationFeature = state.featureMap[destinationFeatureOrLayerId];
@@ -496,6 +541,7 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   function getFullLayer(layerId: FeatureId): ScenarioLayer | undefined {
+    const state = getState();
     if (!state) return;
     const layer = state.layerMap[layerId];
     if (!layer) return;
@@ -629,6 +675,7 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   function deleteFeature(featureId: FeatureId, options: UpdateOptions = {}) {
+    const state = getState();
     if (!state || !update) return;
     const noEmit = options.noEmit ?? false;
     const feature = state.featureMap[featureId];
@@ -646,6 +693,7 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   function duplicateFeature(featureId: FeatureId) {
+    const state = getState();
     if (!state) return;
     const feature = state.featureMap[featureId];
     if (!feature) return;
@@ -720,6 +768,7 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   function updateFeatureState(featureId: FeatureId, undoable = false) {
+    const state = getState();
     if (!state || !update) return;
     const feature = state.featureMap[featureId];
     if (!feature) return;
@@ -740,12 +789,15 @@ export function useGeo(store: NewScenarioStore | null) {
   }
 
   return {
-    everyVisibleUnit,
+    get everyVisibleUnit() {
+      return everyVisibleUnitRef.current;
+    },
     addUnitPosition,
     addLayer,
-    getLayerById: (id: FeatureId) => state?.layerMap[id],
+    getLayerById: (id: FeatureId) => getState()?.layerMap[id],
     getFullLayer,
     getFeatureById: (id: FeatureId) => {
+      const state = getState();
       if (!state) return { feature: undefined, layer: undefined };
       const feature = state.featureMap[id];
       if (!feature) return { feature, layer: undefined };
@@ -754,7 +806,7 @@ export function useGeo(store: NewScenarioStore | null) {
     moveFeature,
     updateLayer,
     deleteLayer,
-    getLayerIndex: (id: FeatureId) => state?.layers.indexOf(id) ?? -1,
+    getLayerIndex: (id: FeatureId) => getState()?.layers.indexOf(id) ?? -1,
     moveLayer,
     addFeature,
     duplicateFeature,
@@ -768,8 +820,8 @@ export function useGeo(store: NewScenarioStore | null) {
     addMapLayer,
     deleteMapLayer,
     updateMapLayer,
-    getMapLayerById: (id: FeatureId) => state?.mapLayerMap[id],
-    getMapLayerIndex: (id: FeatureId) => state?.mapLayers.indexOf(id) ?? -1,
+    getMapLayerById: (id: FeatureId) => getState()?.mapLayerMap[id],
+    getMapLayerIndex: (id: FeatureId) => getState()?.mapLayers.indexOf(id) ?? -1,
     onMapLayerEvent: mapLayerEvent.on,
     onFeatureLayerEvent: featureLayerEvent.on,
     moveMapLayer,

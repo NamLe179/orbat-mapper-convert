@@ -126,13 +126,12 @@ export function useUnitStateManipulations(store: NewScenarioStore) {
   const { update } = store;
 
   function updateUnitState(unitId: EntityId) {
+    const unit = store.state.unitMap[unitId];
+    if (unit) {
+      updateCurrentUnitState(unit, store.state.currentTime);
+    }
+
     update((s) => {
-      const unit = s.unitMap[unitId];
-      if (!unit) return;
-      const timestamp = s.currentTime;
-      // Recalculate derived state inside the draft
-      // updateCurrentUnitState must handle the draft object correctly
-      updateCurrentUnitState(unit, timestamp);
       s.unitStateCounter++;
     });
   }

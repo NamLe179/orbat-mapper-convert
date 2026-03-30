@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import type { NewScenarioStore, ScenarioState } from "./newScenarioStore";
 
 /**
@@ -22,6 +22,55 @@ export function useScenarioState(store: NewScenarioStore | null): ScenarioState 
       });
     },
     () => (store ? store.state : null),
+    () => null,
+  );
+}
+
+/**
+ * Hook to subscribe to a selected slice of scenario state.
+ * Useful for avoiding full-hook re-renders on unrelated store updates.
+ */
+export function useScenarioStateSelector<T>(
+  store: NewScenarioStore | null,
+  selector: (state: ScenarioState) => T,
+  equalityFn: (a: T, b: T) => boolean = Object.is,
+): T | null {
+  const selectedRef = useRef<T | null>(null);
+  const initializedRef = useRef(false);
+
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      if (!store) return () => {};
+
+      return store._store.subscribe(
+        selector,
+        () => {
+          onStoreChange();
+        },
+        { equalityFn },
+      );
+    },
+    () => {
+      if (!store) {
+        initializedRef.current = false;
+        selectedRef.current = null;
+        return null;
+      }
+
+      const next = selector(store.state);
+      if (!initializedRef.current) {
+        initializedRef.current = true;
+        selectedRef.current = next;
+        return next;
+      }
+
+      const prev = selectedRef.current as T;
+      if (!equalityFn(prev, next)) {
+        selectedRef.current = next;
+      }
+
+      return selectedRef.current;
+    },
     () => null,
   );
 }

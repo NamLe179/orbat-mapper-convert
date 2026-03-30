@@ -14,6 +14,7 @@ import BaseToolbar from "./BaseToolbar";
 import ToolbarButton from "./ToolbarButton";
 import { useActiveScenario } from "@/components/injects";
 import { useTimeFormatters } from "@/stores/timeFormatStore";
+import { useStore } from "zustand";
 // import { useUiStore } from "@/stores/uiStore"; // Import nếu cần dùng logic khác
 
 interface MapTimeControllerProps {
@@ -45,8 +46,8 @@ export default function MapTimeController({
   const { scenarioFormatter } = useTimeFormatters();
   // const uiStore = useUiStore(); // Chưa dùng trong template gốc
 
-  // Lấy thời gian hiện tại từ store (giả định store reactive)
-  const currentTime = store.state.currentTime;
+  // Subscribe trực tiếp để cập nhật UI theo timeline/playback.
+  const currentTime = useStore(store._store, (s) => s.currentTime);
 
   return (
     <div className="flex items-center space-x-2">
