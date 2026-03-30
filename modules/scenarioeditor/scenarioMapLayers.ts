@@ -49,6 +49,7 @@ const layersMap = new WeakMap<OLMap, LayerGroup>();
 export function useScenarioMapLayers(olMap: OLMap | null) {
   const scn = useActiveScenario(); // Hook from React Context
   const mapLayersGroupRef = useRef<LayerGroup | null>(null);
+  const scnRef = useRef(scn);
 
   // Hook for interaction logic (Assumed converted to React hook)
   const {
@@ -59,9 +60,32 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
     updateHandler: handleTransformUpdate,
   });
 
+  const startTransformRef = useRef(startTransform);
+  const endTransformRef = useRef(endTransform);
+  const imageTransformIsActiveRef = useRef(imageTransformIsActive);
+
+  useEffect(() => {
+    scnRef.current = scn;
+  }, [scn]);
+
+  useEffect(() => {
+    startTransformRef.current = startTransform;
+  }, [startTransform]);
+
+  useEffect(() => {
+    endTransformRef.current = endTransform;
+  }, [endTransform]);
+
+  useEffect(() => {
+    imageTransformIsActiveRef.current = imageTransformIsActive;
+  }, [imageTransformIsActive]);
+
   // Main Effect: Sync Store -> Map
   useEffect(() => {
-    if (!olMap || !scn) return;
+    if (!olMap) return;
+
+    const scenario = scnRef.current;
+    if (!scenario) return;
 
     const mapLayersGroup = getOrCreateLayerGroup(olMap);
     mapLayersGroupRef.current = mapLayersGroup;
@@ -69,7 +93,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
     // 1. Initialize
     function initializeFromStore() {
       mapLayersGroup.getLayers().clear();
-      scn.geo.mapLayers.forEach((mapLayer) => addLayer(mapLayer.id));
+      scenario.geo.mapLayers.forEach((mapLayer) => addLayer(mapLayer.id));
     }
     
     // Initialize on mount
@@ -119,7 +143,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
         newLayer.setVisible(!(data.isHidden ?? false));
         const layerExtent = newLayer.getExtent();
         
-        scn!.geo.updateMapLayer(
+        scenario.geo.updateMapLayer(
           data.id,
           {
             imageCenter: toLonLat(
@@ -133,7 +157,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
           { noEmit: true, undoable: false },
         );
         
-        scn!.geo.updateMapLayer(
+        scenario.geo.updateMapLayer(
           data.id,
           { _status: "initialized", _isNew: false },
           { noEmit: true, undoable: false },
@@ -182,7 +206,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
           },
         });
     
-        scn!.geo.updateMapLayer(
+        scenario.geo.updateMapLayer(
           data.id,
           { _status: "initialized" },
           { noEmit: true, undoable: false },
@@ -217,7 +241,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
             name: data.name,
           },
         });
-        scn!.geo.updateMapLayer(
+        scenario.geo.updateMapLayer(
           data.id,
           { _status: "loading" },
           { noEmit: true, undoable: false },
@@ -243,8 +267,8 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
               if (tileJson?.attribution) {
                 dataUpdate.attributions = tileJson.attribution;
               }
-              scn!.geo.updateMapLayer(data.id, dataUpdate, { noEmit: true, undoable: false });
-              scn!.geo.updateMapLayer(
+              scenario.geo.updateMapLayer(data.id, dataUpdate, { noEmit: true, undoable: false });
+              scenario.geo.updateMapLayer(
                 data.id,
                 { _status: "initialized", _isNew: false },
                 { noEmit: true, undoable: false },
@@ -253,7 +277,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
             newLayer.setVisible(!(data.isHidden ?? false));
           } else if (source.getState() == "error") {
             unByKey(key);
-            scn!.geo.updateMapLayer(
+            scenario.geo.updateMapLayer(
               data.id,
               { _status: "error" },
               { noEmit: true, undoable: false },
@@ -284,7 +308,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
             name: data.name,
           },
         });
-        scn!.geo.updateMapLayer(
+        scenario.geo.updateMapLayer(
           data.id,
           { _status: "initialized" },
           { noEmit: true, undoable: false },
@@ -303,7 +327,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
     }
 
     function addLayer(layerId: FeatureId, mapLayerData?: ScenarioMapLayer) {
-        const mapLayer = mapLayerData || scn!.geo.getMapLayerById(layerId);
+        const mapLayer = mapLayerData || scenario.geo.getMapLayerById(layerId);
         if (!mapLayer) {
           console.error("Map layer not found:", layerId);
           return;
@@ -315,7 +339,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
     }
 
     function updateLayer(layerId: FeatureId, data: ScenarioMapLayerUpdate) {
-        const mapLayer = scn!.geo.getMapLayerById(layerId);
+        const mapLayer = scenario.geo.getMapLayerById(layerId);
         const layer = getOlLayerById(layerId) as any;
         if (!layer) {
           addLayer(layerId);
@@ -338,7 +362,9 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
           if ("url" in data && data.url !== undefined) {
             deleteLayer(layerId);
             addLayer(layerId);
-            if (imageTransformIsActive) startTransform(layer, layerId);
+            if (imageTransformIsActiveRef.current) {
+              startTransformRef.current(layer, layerId);
+            }
           }
         }
     
@@ -363,7 +389,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
 
     function moveLayer(layerId: FeatureId) {
         const layer = getOlLayerById(layerId);
-        const newIndex = scn!.geo.getMapLayerIndex(layerId);
+        const newIndex = scenario.geo.getMapLayerIndex(layerId);
         if (layer) {
           mapLayersGroup.getLayers().remove(layer);
           mapLayersGroup.getLayers().insertAt(newIndex, layer);
@@ -371,7 +397,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
     }
 
     // 3. Subscriptions
-    const mapLayerEventHandle = scn.geo.onMapLayerEvent((event) => {
+    const mapLayerEventHandle = scenario.geo.onMapLayerEvent((event) => {
         if (event.type === "add") {
           addLayer(event.id, event.data as ScenarioMapLayer);
         } else if (event.type === "remove") {
@@ -383,7 +409,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
         }
     });
 
-    const undoRedoUnsub = scn.store.onUndoRedo(({ action, meta }) => {
+    const undoRedoUnsub = scenario.store.onUndoRedo(({ action, meta }) => {
         if (
           !meta ||
           !["addMapLayer", "updateMapLayer", "deleteMapLayer", "moveMapLayer"].includes(
@@ -394,7 +420,7 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
         const { label, value: layerId } = meta;
         if (label === "addMapLayer") {
           if (action === "undo") {
-            if (imageTransformIsActive) endTransform();
+            if (imageTransformIsActiveRef.current) endTransformRef.current();
             deleteLayer(layerId);
           } else {
             addLayer(layerId);
@@ -403,15 +429,15 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
           if (action === "undo") {
             addLayer(layerId);
           } else {
-            if (imageTransformIsActive) endTransform();
+            if (imageTransformIsActiveRef.current) endTransformRef.current();
             deleteLayer(layerId);
           }
         } else if (label === "updateMapLayer") {
-          const data = scn!.geo.getMapLayerById(layerId);
+          const data = scenario.geo.getMapLayerById(layerId);
           if (data) updateLayer(layerId, data);
-          if (imageTransformIsActive) {
+          if (imageTransformIsActiveRef.current) {
             const olLayer = getOlLayerById(layerId);
-            startTransform(olLayer, layerId);
+            startTransformRef.current(olLayer, layerId);
           }
         } else if (label === "moveMapLayer") {
           moveLayer(layerId);
@@ -435,9 +461,9 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
                 olMap!.getView().fit(layerExtent);
             }
         } else if (action === "startTransform") {
-            startTransform(olLayer, id);
+          startTransformRef.current(olLayer, id);
         } else if (action === "endTransform") {
-            endTransform();
+          endTransformRef.current();
         }
     };
     
@@ -459,14 +485,15 @@ export function useScenarioMapLayers(olMap: OLMap | null) {
         emitter.off(imageLayerAction, handleBusAction);
     };
 
-  }, [olMap, scn, startTransform, endTransform, imageTransformIsActive]);
+  }, [olMap, scn.store]);
 
 
   function handleTransformUpdate(v: TransformUpdate) {
-    if (!scn) return;
+    const scenario = scnRef.current;
+    if (!scenario) return;
     const { id, rotation, center, scale, active } = v;
 
-    scn.geo.updateMapLayer(
+    scenario.geo.updateMapLayer(
       id,
       { imageRotate: rotation, imageCenter: toLonLat(center), imageScale: scale },
       { emitOnly: active, undoable: !active },
