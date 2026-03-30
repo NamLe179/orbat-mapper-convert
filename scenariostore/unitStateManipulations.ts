@@ -63,6 +63,7 @@ import type { NewScenarioStore } from "@/scenariostore/newScenarioStore";
 import type { NState, NUnit } from "@/types/internalModels";
 import type { EntityId, HistoryAction } from "@/types/base";
 import { createInitialState, updateCurrentUnitState } from "@/scenariostore/time";
+import { unitRuntimeState } from "@/scenariostore/runtimeState";
 import type { State, StateAdd } from "@/types/scenarioModels";
 import type { Position } from "@/types/scenarioGeoModels";
 
@@ -142,7 +143,7 @@ export function useUnitStateManipulations(store: NewScenarioStore) {
         const _unit = s.unitMap[unitId];
         if (!_unit) return;
         _unit.state = [];
-        _unit._state = createInitialState(_unit);
+        unitRuntimeState.set(_unit.id, createInitialState(_unit));
       },
       { label: "clearUnitState", value: unitId },
     );

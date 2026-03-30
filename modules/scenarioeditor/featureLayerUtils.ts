@@ -30,6 +30,7 @@ import { SimpleGeometry } from "ol/geom";
 import { useSelectedItems } from "@/stores/selectedStore";
 import { useActiveScenario } from "@/components/injects"; // Hypothetical hook
 import { useFeatureStyles } from "@/geo/featureStyles"; // Hypothetical hook
+import { getFeatureRuntimeState } from "@/scenariostore/runtimeState";
 
 import type { ScenarioFeatureActions } from "@/types/constants";
 import type { NScenarioFeature, NScenarioLayer } from "@/types/internalModels";
@@ -123,8 +124,9 @@ export function createScenarioLayerFeatures(
   const olFeatures: Feature[] = [];
   features.forEach((fullFeature, index) => {
     let feature = fullFeature;
-    if (fullFeature._state) {
-      const { geometry, properties, ...rest } = fullFeature._state;
+    const runtimeState = getFeatureRuntimeState(fullFeature.id);
+    if (runtimeState) {
+      const { geometry } = runtimeState;
       feature = {
         ...fullFeature,
         geometry: geometry || fullFeature.geometry,

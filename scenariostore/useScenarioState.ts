@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { NewScenarioStore, ScenarioState } from "./newScenarioStore";
 
 /**
@@ -12,29 +12,16 @@ import type { NewScenarioStore, ScenarioState } from "./newScenarioStore";
  * ```
  */
 export function useScenarioState(store: NewScenarioStore | null): ScenarioState | null {
-  const [state, setState] = useState<ScenarioState | null>(() => store?.state || null);
-  const [, forceUpdate] = useState(0);
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      if (!store) return () => {};
 
-  useEffect(() => {
-    if (!store) {
-      setState(null);
-      return;
-    }
-
-    // Set initial state
-    setState(store.state);
-
-    // Subscribe to store changes
-    // Zustand vanilla store subscribe signature: (state, prevState) => void
-    const unsubscribe = store.subscribe((newState) => {
-      setState(newState);
-      forceUpdate(n => n + 1); // Force re-render
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [store]);
-
-  return state;
+      // Zustand vanilla store subscribe signature: (state, prevState) => void
+      return store.subscribe(() => {
+        onStoreChange();
+      });
+    },
+    () => (store ? store.state : null),
+    () => null,
+  );
 }

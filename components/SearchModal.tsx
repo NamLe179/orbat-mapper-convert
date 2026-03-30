@@ -10,6 +10,7 @@ import type { NUnit } from "@/types/internalModels";
 // Utils
 import { groupBy, htmlTagEscape } from "../utils";
 import { useActiveScenario } from "@/components/injects";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 // Components
 import SimpleModal from "./SimpleModal";
@@ -68,7 +69,10 @@ export default function SearchModal({
 
     return hits
       .filter((h) => {
-        if (limitToPosition) return getUnitById((h.obj as NUnit).id)?._state?.location;
+        if (limitToPosition) {
+          const unit = getUnitById((h.obj as NUnit).id);
+          return unit ? getUnitRuntimeState(unit.id)?.location : false;
+        }
         return true;
       })
       .slice(0, 10)

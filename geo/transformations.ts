@@ -26,6 +26,7 @@ import { centroid as turfCentroid } from "@turf/centroid";
 import { explode as turfExplode } from "@turf/explode";
 import { union as turfUnion } from "@turf/union";
 import { nanoid } from "@/utils";
+import { getFeatureRuntimeState, getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 // --- TYPES ---
 
@@ -142,14 +143,14 @@ export function doScenarioFeatureTransformation(
   const geoJSONFeatureOrFeatureCollection =
     features.length > 1
       ? turfFeatureCollection(
-          features.map((f) => turfFeature(f?._state?.geometry ?? f.geometry)),
+          features.map((f) => turfFeature(getFeatureRuntimeState(f.id)?.geometry ?? f.geometry)),
         )
-      : turfFeature(features[0]?._state?.geometry ?? features[0].geometry);
+      : turfFeature(getFeatureRuntimeState(features[0].id)?.geometry ?? features[0].geometry);
   return doTransformations(geoJSONFeatureOrFeatureCollection, transformations);
 }
 
 function unitToFeature(unit: NUnit): Feature {
-  const location = unit?._state?.location ?? unit.location!;
+  const location = getUnitRuntimeState(unit.id)?.location ?? unit.location!;
   return point(location);
 }
 
@@ -157,7 +158,7 @@ export function doUnitTransformations(
   units: NUnit[],
   transformations: TransformationOperation[],
 ) {
-  const filteredUnits = units.filter((unit) => unit?._state?.location ?? unit.location);
+  const filteredUnits = units.filter((unit) => getUnitRuntimeState(unit.id)?.location ?? unit.location);
   if (filteredUnits.length === 0) return;
   const geoJSONFeatureOrFeatureCollection =
     filteredUnits.length > 1

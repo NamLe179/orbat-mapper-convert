@@ -22,6 +22,7 @@ import TransformForm from "@/modules/scenarioeditor/TransformForm";
 // Hooks & Logic
 import { useActiveScenario, useActiveLayer, useActiveMap } from "@/components/injects";
 import { useSelectedItems } from "@/stores/selectedStore";
+import { getFeatureRuntimeState } from "@/scenariostore/runtimeState";
 import { useTransformSettingsStore } from "@/stores/transformStore";
 import { useTimeFormatters } from "@/stores/timeFormatStore";
 import { 
@@ -122,7 +123,11 @@ export default function FeatureTransformations({ unitMode = false }: Props) {
     if (!unitMode && selectedItems[0]) {
       setToggleRedraw(prev => !prev);
     }
-  }, [unitMode, (selectedItems[0] as any)?.geometry, (selectedItems[0] as any)?._state?.geometry]);
+  }, [
+    unitMode,
+    (selectedItems[0] as any)?.geometry,
+    selectedItems[0] ? getFeatureRuntimeState((selectedItems[0] as any).id)?.geometry : undefined,
+  ]);
 
   const onSubmit = (updateMode = false) => {
     if (selectedItems.length === 0) return;

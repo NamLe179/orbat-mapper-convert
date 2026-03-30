@@ -30,6 +30,7 @@ import { useActiveUnit } from "@/stores/dragStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSelectedItems } from "@/stores/selectedStore";
 import { useUnitMenu } from "@/hooks/scenarioActions";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 // Components
 import DotsMenu from "./DotsMenu";
@@ -105,12 +106,12 @@ export default function OrbatTreeItem({
   , [settingsStore.orbatShortName, unit.shortName, unit.name]);
 
   const customSidc = useMemo(() => {
-    const currentSidc = unit._state?.sidc || unit.sidc;
+    const currentSidc = getUnitRuntimeState(unit.id)?.sidc || unit.sidc;
     if (currentSidc.startsWith(CUSTOM_SYMBOL_PREFIX)) {
       return currentSidc.slice(CUSTOM_SYMBOL_SLICE);
     }
     return null;
-  }, [unit._state?.sidc, unit.sidc]);
+  }, [unit.id, unit.sidc]);
 
   const isActiveUnit = activeUnitId === unit.id;
   const isParent = Boolean(item.children && item.children.length);
@@ -281,7 +282,7 @@ export default function OrbatTreeItem({
                 ) : (
                   <>
                     <MilitarySymbol
-                      sidc={unit._state?.sidc || unit.sidc}
+                      sidc={getUnitRuntimeState(unit.id)?.sidc || unit.sidc}
                       size={settingsStore.orbatIconSize}
                       options={combinedOptions}
                     />
@@ -306,7 +307,7 @@ export default function OrbatTreeItem({
                 {unitLabel}
               </span>
               
-              {unit._state?.location && (
+              {getUnitRuntimeState(unit.id)?.location && (
                 <span className="text-destructive-foreground">&deg;</span>
               )}
             </span>

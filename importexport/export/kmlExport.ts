@@ -10,6 +10,7 @@ import type { TScenario } from "@/scenariostore";
 import { symbolGenerator } from "@/symbology/milsymbwrapper";
 import { useSelectedItems, useSelectedStore } from "@/stores/selectedStore";
 import { hashObject } from "@/utils";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 import type { UnitSymbolOptions } from "@/types/scenarioModels";
 
 type RenderSymbolSettings = {
@@ -73,9 +74,9 @@ export function useKmlExport(scenario: TScenario) {
             const side = sideMap[sideId];
             const units: NUnit[] = [];
             unitActions.walkSide(sideId, (unit: any) => {
-              // React: unit._state.location check (assuming reactive unwrapped)
+              // Runtime location check from hot-path runtime state map.
               if (
-                unit._state?.location &&
+                getUnitRuntimeState(unit.id)?.location &&
                 (opts.includeSelectedUnitsOnly
                   ? selectedUnitIds.has(unit.id)
                   : true)
@@ -101,7 +102,7 @@ export function useKmlExport(scenario: TScenario) {
               const sideGroupUnits: NUnit[] = [];
               unitActions.walkItem(group.id, (unit) => {
                 if (
-                  unit._state?.location &&
+                  getUnitRuntimeState(unit.id)?.location &&
                   (opts.includeSelectedUnitsOnly
                     ? selectedUnitIds.has(unit.id)
                     : true)
@@ -116,7 +117,7 @@ export function useKmlExport(scenario: TScenario) {
             for (const rootUnitId of side.subUnits) {
               unitActions.walkItem(rootUnitId, (unit) => {
                 if (
-                  unit._state?.location &&
+                  getUnitRuntimeState(unit.id)?.location &&
                   (opts.includeSelectedUnitsOnly
                     ? selectedUnitIds.has(unit.id)
                     : true)
@@ -214,7 +215,7 @@ export function useKmlExport(scenario: TScenario) {
     unit: NUnit,
     opts: KmlKmzExportSettings,
   ): RenderSymbolSettings {
-    const sidc = unit._state?.sidc || unit.sidc;
+    const sidc = getUnitRuntimeState(unit.id)?.sidc || unit.sidc;
     let symbolOptions = unitActions.getCombinedSymbolOptions(unit);
 
     if (opts.renderAmplifiers) {

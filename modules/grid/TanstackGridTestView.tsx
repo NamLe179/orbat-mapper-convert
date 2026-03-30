@@ -35,6 +35,7 @@ import type { NUnit } from "@/types/internalModels";
 import { useScenario } from "@/scenariostore"; // Giả định hook React
 import { SideAction, SideActions } from "@/types/constants";
 import type { MenuItemData } from "@/components/types";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState"; // Importing the new runtime state accessor
 import { cn } from "@/lib/utils"; // Giả định utility merge class
 
 // Custom Components (Giả định đã convert)
@@ -179,7 +180,7 @@ export default function TanstackGridTestView() {
         header: "id",
         enableGlobalFilter: false,
       }),
-      columnHelper.accessor((row) => row._state?.location, {
+      columnHelper.accessor((row) => getUnitRuntimeState(row.id)?.location, {
         id: "position",
         header: "Position",
         enableSorting: false,

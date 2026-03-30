@@ -1,6 +1,7 @@
 import React from "react";
 import { type UnitSearchResult } from "@/components/types";
 import UnitSymbol from "@/components/UnitSymbol"; 
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 interface CommandPaletteUnitItemProps {
   item: UnitSearchResult;
@@ -25,7 +26,7 @@ export default function CommandPaletteUnitItem({ item }: CommandPaletteUnitItemP
           />
         )}
         
-        {item._state?.location && (
+        {getUnitRuntimeState(String(item.id))?.location && (
           <span className="absolute -right-1 bottom-0 block translate-x-1/2 translate-y-1/2 transform rounded-full border-2 border-white">
             <span className="block h-1.5 w-1.5 rounded-full bg-red-800" />
           </span>

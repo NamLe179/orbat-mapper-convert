@@ -21,6 +21,7 @@ import type { OrbatMapperGeoJsonLayer } from "@/importexport/jsonish/types";
 import { saveBlobToLocalFile } from "@/utils/files";
 import { useKmlExport } from "./kmlExport";
 import { useGeoJsonConverter } from "@/importexport/export/geojsonConverter";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 export interface UseScenarioExportOptions {
   activeScenario: TScenario;
@@ -117,9 +118,9 @@ export function useScenarioExport(options?: UseScenarioExportOptions) {
         Object.keys(sideMap).forEach((sideId) => {
           const side = sideMap[sideId];
           const units: NUnit[] = [];
-          unitActions.walkSide(sideId, (unit) => {
-            // React: Access ._state directly assuming object is reactive or plain
-            if (unit._state?.location) units.push(unit);
+            unitActions.walkSide(sideId, (unit) => {
+              // Runtime location check from hot-path runtime state map.
+              if (getUnitRuntimeState(unit.id)?.location) units.push(unit);
           });
           layers.push({
             name: side.name,

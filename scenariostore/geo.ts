@@ -47,6 +47,11 @@ import { moveItemMutable, nanoid, removeElement } from "@/utils";
 import type { DropTarget } from "@/components/types";
 import type { Geometry } from "geojson";
 import { updateCurrentUnitState } from "@/scenariostore/time";
+import {
+  featureRuntimeState,
+  getFeatureRuntimeState,
+  getUnitRuntimeState,
+} from "@/scenariostore/runtimeState";
 
 // TODO: API Integration - Uncomment and configure when backend is ready
 // async function apiCreateLayer(scenarioId: string, layer: NScenarioLayer): Promise<string> {
@@ -234,9 +239,9 @@ export function useGeo(store: NewScenarioStore | null) {
       (unit) =>
         !(unit._gid
           ? hiddenGroups.has(unit._gid)
-          : hiddenSides.has(unit._sid)) && unit._state?.location,
+          : hiddenSides.has(unit._sid)) && getUnitRuntimeState(unit.id)?.location,
     );
-  }, [isReady, state?.unitMap, hiddenGroups, hiddenSides]);
+  }, [isReady, state?.unitMap, hiddenGroups, hiddenSides, state?.unitStateCounter]);
 
   const layers = useMemo(() => {
     if (!isReady) return [];
@@ -297,7 +302,6 @@ export function useGeo(store: NewScenarioStore | null) {
         const u = s.unitMap[unitId];
         const t = atTime ?? s.currentTime;
         newState = { t, location: coordinates };
-        if (t === s.currentTime) u._state = newState;
         if (!u.state) u.state = [];
         for (let i = 0, len = u.state.length; i < len; i++) {
           if (t < u.state[i].t) {
@@ -334,7 +338,6 @@ export function useGeo(store: NewScenarioStore | null) {
         const u = s.featureMap[featureId];
         const t = atTime ?? s.currentTime;
         newState = { t, geometry };
-        if (t === s.currentTime) u._state = newState;
         if (!u.state) u.state = [];
         for (let i = 0, len = u.state.length; i < len; i++) {
           if (t < u.state[i].t) {
@@ -722,13 +725,7 @@ export function useGeo(store: NewScenarioStore | null) {
     if (!feature) return;
     const timestamp = state.currentTime;
     if (!feature.state || !feature.state.length) {
-      // Assuming store has a generic update or we need to update state via action
-      // For now, mirroring Vue logic of mutating feature._state
-      // In React store, we should call update to set this derived property if it needs to be reactive
-      update(s => {
-          const f = s.featureMap[featureId];
-          if(f) f._state = undefined;
-      });
+      featureRuntimeState.set(featureId, undefined);
       return;
     }
     let currentState = createInitialFeatureState(feature);
@@ -739,10 +736,7 @@ export function useGeo(store: NewScenarioStore | null) {
         break;
       }
     }
-     update(s => {
-          const f = s.featureMap[featureId];
-          if(f) f._state = currentState;
-      });
+    featureRuntimeState.set(featureId, currentState);
   }
 
   return {

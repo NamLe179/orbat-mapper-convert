@@ -29,6 +29,7 @@ import { GeoJSON } from "ol/format";
 // Store Imports
 import { useActiveScenario } from "@/components/injects";
 import { useFeatureStyles } from "@/geo/featureStyles";
+import { getFeatureRuntimeState } from "@/scenariostore/runtimeState";
 
 const undoActionLabels: ActionLabel[] = [
   "deleteLayer",
@@ -238,7 +239,8 @@ export function useScenarioFeatureLayers(olMap: OLMap | null) {
         }
 
         if (isDynamic && existing) {
-          const signature = `${feature._hidden ? 1 : 0}|${feature._state?.t ?? "-"}|${feature._state?.geometry?.type ?? "-"}`;
+          const runtimeState = getFeatureRuntimeState(feature.id);
+          const signature = `${feature._hidden ? 1 : 0}|${runtimeState?.t ?? "-"}|${runtimeState?.geometry?.type ?? "-"}`;
           const prevSignature = dynamicFeatureSignatureRef.current.get(feature.id);
           if (prevSignature === signature) {
             continue;
@@ -395,6 +397,20 @@ export function useScenarioFeatureLayers(olMap: OLMap | null) {
 
     return () => unsubscribe();
   }, [olMap, scn.store]); // Add dependencies
+
+  // Hot-path redraw for dynamic features driven by runtime state changes.
+  useEffect(() => {
+    if (!olMap) return;
+
+    const unsubscribe = scn.store._store.subscribe(
+      (s) => s.unitStateCounter,
+      () => {
+        syncFeatureLayersFromStore({ filterVisible: true });
+      },
+    );
+
+    return unsubscribe;
+  }, [olMap, scn.store]);
 
   return {
     initializeFeatureLayersFromStore,

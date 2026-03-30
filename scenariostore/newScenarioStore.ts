@@ -28,6 +28,7 @@ import { DEFAULT_BASEMAP_ID } from "@/config/constants";
 import { upgradeScenarioIfNecessary } from "@/scenariostore/upgrade";
 import { SYMBOL_FILL_COLORS } from "@/config/colors"; // Removed .ts extension
 import { useScenarioTime } from "./time";
+import { featureRuntimeState, unitRuntimeState } from "./runtimeState";
 
 // Types
 import type {
@@ -295,7 +296,6 @@ export function prepareScenario(newScenario: Scenario): ScenarioState {
       .forEach((s) => {
         s.status = tempUnitStatusIdMap[s.status!] || addUnitStatus({ name: s.status! });
       });
-    unit._state = null;
 
     const newState: NState[] = unit.state.map((s) => {
       const { update, diff, ...rest } = s;
@@ -564,6 +564,9 @@ export function useNewScenarioStore(data: Scenario): NewScenarioStore {
   const inputState = prepareScenario(data);
   const store = createVanillaStore(inputState);
 
+  unitRuntimeState.clear();
+  featureRuntimeState.clear();
+
   const storeWrapper: NewScenarioStore = {
     // Getter for state to allow direct access (store.state.xyz)
     get state() {
@@ -576,8 +579,10 @@ export function useNewScenarioStore(data: Scenario): NewScenarioStore {
       return false;
     },
     // Undo/redo disabled: apply updates directly without history bookkeeping.
-    update: (recipe) => {
-      store.setState(recipe);
+    update: (recipe, _meta) => {
+      store.setState((state) => {
+        recipe(state);
+      });
     },
     groupUpdate: (callback) => {
         callback();

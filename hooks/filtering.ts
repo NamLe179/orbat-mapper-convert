@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { NUnit } from "@/types/internalModels";
 import type { EntityId } from "@/types/base";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 export interface NOrbatItemData {
   unit: NUnit;
@@ -45,7 +46,7 @@ export function filterUnits(
 
     let matched = false;
     let childMatched = false;
-    const hasPosition = Boolean(currentUnit?._state?.location);
+    const hasPosition = Boolean(currentUnit && getUnitRuntimeState(currentUnit.id)?.location);
     const children: NOrbatItemData[] = [];
 
     // Kiểm tra match text

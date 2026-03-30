@@ -41,6 +41,7 @@ import { useTabStore } from "@/stores/tabStore";
 import { useGeoStore, useUnitSettingsStore } from "@/stores/geoStore";
 import { useSelectedItems } from "@/stores/selectedStore";
 import { useUnitActions } from "@/hooks/scenarioActions";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { getUnitDragItem } from "@/types/draggables";
 import { formatPosition } from "@/geo/utils";
@@ -84,7 +85,7 @@ export default function UnitDetails({ unitId }: UnitDetailsProps) {
   const isMultiMode = selectedUnitIds.size > 1;
 
   const unitStatus = useMemo(() => {
-    const status = unit?._state?.status || unit?.status;
+    const status = unit ? getUnitRuntimeState(unit.id)?.status || unit.status : undefined;
     return status ? scn.store.state.unitStatusMap[status]?.name : undefined;
   }, [unit, scn.store.state.unitStatusMap]);
 
@@ -182,7 +183,7 @@ export default function UnitDetails({ unitId }: UnitDetailsProps) {
             >
               <UnitSymbol
                 className="w-16"
-                sidc={unit._state?.sidc || unit.sidc}
+                sidc={getUnitRuntimeState(unit.id)?.sidc || unit.sidc}
                 size={34}
                 options={{ ...scn.unitActions.getCombinedSymbolOptions(unit), outlineWidth: 8 }}
               />

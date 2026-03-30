@@ -19,6 +19,7 @@ import type { NUnit } from "@/types/internalModels";
 import { convertToMetric } from "@/utils/convert";
 import { createSimpleStyle } from "@/geo/simplestyle";
 import { useActiveScenario } from "@/components/injects"; // Import store
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 // --- Helpers & Styles ---
 
@@ -41,12 +42,13 @@ const gjf = new GeoJSON({
 });
 
 function createRangeRings(unit: NUnit) {
+  const runtimeState = getUnitRuntimeState(unit.id);
   return (
     unit.rangeRings
       ?.map((r, i) =>
-        !r.hidden && unit._state?.location
+        !r.hidden && runtimeState?.location
           ? circle(
-              unit._state.location,
+              runtimeState.location,
               convertToMetric(r.range, r.uom || "km") / 1000,
               {
                 properties: {

@@ -1,3 +1,4 @@
+import { unitRuntimeState } from "@/scenariostore/runtimeState";
 import { klona } from "klona";
 import { nanoid, moveElement, removeElement } from "@/utils";
 
@@ -865,7 +866,7 @@ export function useUnitManipulations(store: NewScenarioStore) {
     unit._sid = side.id;
     unit._isOpen = false;
     if (!unit.state || !unit.state.length) {
-      unit._state = createInitialState(unit);
+      unitRuntimeState.set(unit.id, createInitialState(unit));
     }
     if (noUndo) {
       // Assuming 's' passed here is a mutable object (draft or state)
@@ -994,7 +995,7 @@ export function useUnitManipulations(store: NewScenarioStore) {
               _isOpen: false,
             };
             if (!newUnit.state || !newUnit.state.length) {
-              newUnit._state = createInitialState(newUnit);
+              unitRuntimeState.set(newUnit.id, createInitialState(newUnit));
             }
             s.unitMap[newUnit.id] = newUnit;
             clonedUnitIds.push(newUnit.id);

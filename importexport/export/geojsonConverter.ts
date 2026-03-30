@@ -8,6 +8,7 @@ import type {
   MilSymbolProperties,
   OrbatMapperGeoJsonCollection,
 } from "@/importexport/jsonish/types";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 export function useGeoJsonConverter(scenario: TScenario) {
   const { geo, unitActions } = scenario;
@@ -25,9 +26,10 @@ export function useGeoJsonConverter(scenario: TScenario) {
 
       const symbolOptions = unitActions.getCombinedSymbolOptions(unit);
 
-      // Lưu ý: unit._state?.location! giả định unit luôn có vị trí khi gọi hàm này
+      // Runtime location is sourced from hot-path runtime state map.
       // Trong React component, nên filter trước hoặc kiểm tra kỹ
-      const location = unit._state?.location || unit.location;
+      const runtimeState = getUnitRuntimeState(unit.id);
+      const location = runtimeState?.location || unit.location;
       
       if (!location) {
         throw new Error(`Unit ${unit.name} does not have a valid location.`);
@@ -39,7 +41,7 @@ export function useGeoJsonConverter(scenario: TScenario) {
           id: includeIdInProperties ? id : undefined,
           name,
           shortName,
-          sidc: unit._state?.sidc || sidc,
+          sidc: runtimeState?.sidc || sidc,
           description,
           ...(unit.textAmplifiers ?? {}),
           ...symbolOptions,

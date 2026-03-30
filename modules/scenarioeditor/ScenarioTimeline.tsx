@@ -16,7 +16,7 @@ import { throttle } from "lodash";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { useStore } from "zustand";
+import { shallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 
 // Project Imports
@@ -72,6 +72,119 @@ interface Tick {
   timestamp: number;
 }
 
+const CurrentTimeMarker = React.memo(function CurrentTimeMarker() {
+  return (
+    <div className="bg-background flex h-3.5 items-center justify-center overflow-clip">
+      <Triangle className="h-4 w-4 rotate-180 fill-red-900 text-red-900" />
+    </div>
+  );
+});
+
+type TimelineGridLayerProps = {
+  animate: boolean;
+  totalXOffset: number;
+  timelineWidth: number;
+  binsWithX: Array<{ x: number; count: number }>;
+  majorWidth: number;
+  countColor: (count: number) => unknown;
+  eventsWithX: Array<{ x: number; event: any }>;
+  goToScenarioEvent: (eventOrEventId: string | NScenarioEvent) => void;
+  majorTicks: Tick[];
+  minorTicks: Tick[];
+  minorWidth: number;
+};
+
+const TimelineGridLayer = React.memo(function TimelineGridLayer({
+  animate,
+  totalXOffset,
+  timelineWidth,
+  binsWithX,
+  majorWidth,
+  countColor,
+  eventsWithX,
+  goToScenarioEvent,
+  majorTicks,
+  minorTicks,
+  minorWidth,
+}: TimelineGridLayerProps) {
+  return (
+    <div
+      className={cn(
+        "touch-none text-sm select-none",
+        animate ? "transition-all duration-100 ease-out" : "transition-none"
+      )}
+      style={{ transform: `translate(${totalXOffset}px, 0)` }}
+    >
+      <div className="flex justify-center">
+        <div
+          className="relative h-4 flex-none text-center"
+          style={{ width: `${timelineWidth}px` }}
+        >
+          {binsWithX.map(({ x, count }: { x: number; count: number }, idx: number) => (
+            <div
+              key={`bin-${x}-${idx}`}
+              className="absolute top-1 h-2 w-4 rounded border border-gray-500"
+              style={{
+                left: `${x}px`,
+                width: `${Math.max(majorWidth / 24, 8)}px`,
+                backgroundColor: countColor(count) as string,
+              }}
+              onMouseMove={(e) => e.stopPropagation()}
+              title={`${count} unit events`}
+            />
+          ))}
+
+          {eventsWithX.map(({ x, event }: { x: number; event: any }) => (
+            <div
+              key={event.id}
+              role="button"
+              className="absolute h-4 w-4 -translate-x-1/2 cursor-pointer rounded-full border border-orange-600 hover:bg-red-900"
+              style={{ left: `${x}px`, backgroundColor: "#f59e0b" }}
+              onMouseMove={(e) => e.stopPropagation()}
+              title={event.title}
+              onClick={(e) => {
+                e.stopPropagation();
+                goToScenarioEvent(event);
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-center">
+        <div
+          className="relative flex-none text-center"
+          style={{ width: `${timelineWidth}px` }}
+        />
+      </div>
+
+      <div className="border-muted-foreground flex justify-center">
+        {majorTicks.map((tick) => (
+          <div
+            key={`major-${tick.timestamp}`}
+            className="border-muted-foreground flex-none border-r border-b pl-0.5"
+            style={{ width: `${majorWidth}px` }}
+          >
+            {tick.label}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-center text-xs">
+        {minorTicks.map((tick) => (
+          <div
+            key={`minor-${tick.timestamp}`}
+            className="text-muted-foreground border-muted-foreground min-h-[1rem] flex-none border-r pl-0.5"
+            style={{ width: `${minorWidth}px` }}
+          >
+            {tick.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
 // --- Main Component ---
 export default function ScenarioTimeline() {
   // --- Hooks ---
@@ -93,14 +206,21 @@ export default function ScenarioTimeline() {
     (s) => s.currentTime,
     Object.is,
   );
-  const currentScenarioDayAnchor = useStore(
+  const histogramData = useStoreWithEqualityFn(
     store._store,
-    (s) => +utcDay.floor(new Date(s.currentTime)),
+    (s) => ({
+      unitStateCounter: s.unitStateCounter,
+      featureStateCounter: s.featureStateCounter,
+    }),
+    (a, b) =>
+      a.unitStateCounter === b.unitStateCounter &&
+      a.featureStateCounter === b.featureStateCounter,
   );
-  const unitStateCounter = useStore(store._store, (s) => s.unitStateCounter);
-  const featureStateCounter = useStore(store._store, (s) => s.featureStateCounter);
-  const events = useStore(store._store, (s) => s.events);
-  const eventMap = useStore(store._store, (s) => s.eventMap);
+  const eventsData = useStoreWithEqualityFn(
+    store._store,
+    (s) => ({ events: s.events, eventMap: s.eventMap }),
+    shallow,
+  );
 
   // --- Element & Size ---
   const { ref: elRef, width } = useElementSize();
@@ -124,13 +244,17 @@ export default function ScenarioTimeline() {
     [currentScenarioTimestamp, timeZone],
   );
   const tzOffset = useMemo(() => scenarioTime.utcOffset(), [scenarioTime]);
+  const currentScenarioDayAnchor = useMemo(
+    () => +utcDay.floor(new Date(currentScenarioTimestamp)),
+    [currentScenarioTimestamp],
+  );
 
   // Histogram Data (Compute on updates)
   const { histogram, max: maxCount } = useMemo(() => {
     // Trigger histogram re-calc only when state counters change.
-    const _trigger = unitStateCounter + featureStateCounter;
+    const _trigger = histogramData.unitStateCounter + histogramData.featureStateCounter;
     return computeTimeHistogram();
-  }, [unitStateCounter, featureStateCounter, computeTimeHistogram]);
+  }, [histogramData, computeTimeHistogram]);
 
   const countColor = useMemo(
     () => scaleSequential(interpolateOranges).domain([1, maxCount]),
@@ -197,14 +321,14 @@ export default function ScenarioTimeline() {
     if (!startTs && !endTs) return [];
 
     const msPerPixel = majorWidth / (MS_PER_HOUR * 24);
-    return events
-      .map((id: string) => eventMap[id])
+    return eventsData.events
+      .map((id: string) => eventsData.eventMap[id])
       .filter((e: any) => e && e.startTime >= startTs && e.startTime <= endTs)
       .map((event: any) => ({
         x: (event.startTime - startTs + tzOffset * 60 * 1000) * msPerPixel,
         event,
       }));
-  }, [timelineGrid, majorWidth, events, eventMap, tzOffset]);
+  }, [timelineGrid, majorWidth, eventsData, tzOffset]);
 
   const binsWithX = useMemo(() => {
     const { startTs, endTs } = timelineGrid;
@@ -442,92 +566,21 @@ export default function ScenarioTimeline() {
         onMouseEnter={() => setShowHoverMarker(true)}
         onMouseLeave={() => setShowHoverMarker(false)}
       >
-          {/* Center Indicator */}
-          <div className="bg-background flex h-3.5 items-center justify-center overflow-clip">
-            <Triangle className="h-4 w-4 rotate-180 fill-red-900 text-red-900" />
-          </div>
+          <CurrentTimeMarker />
 
-          {/* Scrolling Container */}
-          <div
-            className={cn(
-              "touch-none text-sm select-none",
-              animate ? "transition-all duration-100 ease-out" : "transition-none"
-            )}
-            style={{ transform: `translate(${totalXOffset}px, 0)` }}
-          >
-            {/* Histogram & Events */}
-            <div className="flex justify-center">
-              <div
-                className="relative h-4 flex-none text-center"
-                style={{ width: `${timelineWidth}px` }}
-              >
-                {/* Histogram Bars */}
-                {binsWithX.map(({ x, count }: { x: number; count: number }, idx: number) => (
-                  <div
-                    key={`bin-${x}-${idx}`}
-                    className="absolute top-1 h-2 w-4 rounded border border-gray-500"
-                    style={{
-                      left: `${x}px`,
-                      width: `${Math.max(majorWidth / 24, 8)}px`,
-                      backgroundColor: countColor(count) as unknown as string,
-                    }}
-                    onMouseMove={(e) => e.stopPropagation()}
-                    title={`${count} unit events`}
-                  />
-                ))}
-
-                {/* Events Dots */}
-                {eventsWithX.map(({ x, event }: { x: number; event: any }) => (
-                  <div
-                    key={event.id}
-                    role="button"
-                    className="absolute h-4 w-4 -translate-x-1/2 cursor-pointer rounded-full border border-orange-600 hover:bg-red-900"
-                    style={{ left: `${x}px`, backgroundColor: '#f59e0b' }}
-                    onMouseMove={(e) => e.stopPropagation()}
-                    title={event.title}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      goToScenarioEvent(event);
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Spacer */}
-            <div className="flex justify-center">
-              <div
-                className="relative flex-none text-center"
-                style={{ width: `${timelineWidth}px` }}
-              />
-            </div>
-
-            {/* Major Ticks */}
-            <div className="border-muted-foreground flex justify-center">
-              {majorTicks.map((tick) => (
-                <div
-                  key={`major-${tick.timestamp}`}
-                  className="border-muted-foreground flex-none border-r border-b pl-0.5"
-                  style={{ width: `${majorWidth}px` }}
-                >
-                  {tick.label}
-                </div>
-              ))}
-            </div>
-
-            {/* Minor Ticks */}
-            <div className="flex justify-center text-xs">
-              {minorTicks.map((tick) => (
-                <div
-                  key={`minor-${tick.timestamp}`}
-                  className="text-muted-foreground border-muted-foreground min-h-[1rem] flex-none border-r pl-0.5"
-                  style={{ width: `${minorWidth}px` }}
-                >
-                  {tick.label}
-                </div>
-              ))}
-            </div>
-          </div>
+          <TimelineGridLayer
+            animate={animate}
+            totalXOffset={totalXOffset}
+            timelineWidth={timelineWidth}
+            binsWithX={binsWithX}
+            majorWidth={majorWidth}
+            countColor={countColor}
+            eventsWithX={eventsWithX}
+            goToScenarioEvent={goToScenarioEvent}
+            majorTicks={majorTicks}
+            minorTicks={minorTicks}
+            minorWidth={minorWidth}
+          />
 
           {/* Hover Marker */}
           {showHoverMarker && !isDraggingUi && (

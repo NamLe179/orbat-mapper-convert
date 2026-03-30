@@ -32,6 +32,7 @@ import { useActiveScenario } from "@/components/injects";
 import { useSelectedItems } from "@/stores/selectedStore";
 import { useEquipmentEditStore, usePersonnelEditStore } from "@/stores/toeStore";
 import { useUiStore } from "@/stores/uiStore";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 import { useUnitEquipmentTableStore, useUnitPersonnelTableStore } from "@/stores/tableStores";
 import { createToeTableColumns, useToeEditableItems } from "@/hooks/toeUtils";
 
@@ -116,8 +117,9 @@ export default function UnitDetailsToe({ unit, isLocked = false }: UnitDetailsTo
     allUnitIds.forEach((unitId) => {
       const u = unitMap[unitId];
       if (!u) return;
-      const equip = u._state?.equipment ?? u.equipment ?? [];
-      const pers = u._state?.personnel ?? u.personnel ?? [];
+      const runtimeState = getUnitRuntimeState(u.id);
+      const equip = runtimeState?.equipment ?? u.equipment ?? [];
+      const pers = runtimeState?.personnel ?? u.personnel ?? [];
 
       equip.forEach((e) => {
         const curr = aggEquipment[e.id] || { count: 0, onHand: 0 };

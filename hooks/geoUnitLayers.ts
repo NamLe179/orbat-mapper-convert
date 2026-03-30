@@ -34,6 +34,7 @@ import { getCoordinateFormatFunction } from "@/utils/geoConvert";
 import { LayerTypes } from "@/modules/scenarioeditor/featureLayerUtils";
 import { isScenarioFeatureDragItem, isUnitDragItem } from "@/types/draggables";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 // Styles
 import Text from "ol/style/Text";
@@ -176,7 +177,8 @@ export function useUnitLayer(olMap: OLMap | null) {
 
     let labelData = labelStyleCache.get(unitId);
     if (!labelData) {
-      const unitStyle = unitStyleCache.get(unit._ikey ?? unitId);
+      const unitCacheKey = unitCacheKeyMap.get(unitId) ?? unitId;
+      const unitStyle = unitStyleCache.get(unitCacheKey);
       labelData = createUnitLabelData(unit, unitStyle, {
         wrapLabels: mapSettings.mapWrapUnitLabels,
         wrapWidth: mapSettings.mapWrapLabelWidth,
@@ -232,7 +234,8 @@ export function useUnitLayer(olMap: OLMap | null) {
     const seen = new Set<string>();
 
     for (const unit of geo.everyVisibleUnit) {
-      if (!unit._state?.location) continue;
+      const runtimeState = getUnitRuntimeState(unit.id);
+      if (!runtimeState?.location) continue;
 
       const unitId = unit.id;
       seen.add(unitId);
@@ -241,10 +244,10 @@ export function useUnitLayer(olMap: OLMap | null) {
       if (existing) {
         const geom = existing.getGeometry();
         if (geom instanceof Point) {
-          geom.setCoordinates(fromLonLat(unit._state.location));
+          geom.setCoordinates(fromLonLat(runtimeState.location));
         }
       } else {
-        source.addFeature(createUnitFeatureAt(unit._state.location, unit));
+        source.addFeature(createUnitFeatureAt(runtimeState.location, unit));
       }
     }
 
@@ -273,6 +276,20 @@ export function useUnitLayer(olMap: OLMap | null) {
   useEffect(() => {
     drawUnits();
   }, [drawUnits]);
+
+  // Subscribe directly to vanilla store for hot-path redraw without React re-render.
+  useEffect(() => {
+    const unsubscribe = scenario.store._store.subscribe(
+      (s) => s.unitStateCounter,
+      () => {
+        drawUnits();
+        unitLayer.changed();
+        labelLayer.changed();
+      },
+    );
+
+    return unsubscribe;
+  }, [scenario.store, drawUnits, unitLayer, labelLayer]);
 
   return { unitLayer, labelLayer, drawUnits };
 }

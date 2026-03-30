@@ -12,6 +12,7 @@ import type { Position } from "geojson";
 import type { Unit } from "@/types/scenarioModels";
 import type { MeasurementTypes, MeasurementUnit } from "@/hooks/geoMeasurement";
 import type { NUnit } from "@/types/internalModels";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 export interface ZoomOptions {
   maxZoom?: number;
@@ -42,7 +43,7 @@ export const useGeoStore = create<GeoState>((set, get) => ({
   zoomToUnit: (unit, duration = 900) => {
     const { olMap } = get();
     if (!olMap) return;
-    const location = unit?._state?.location;
+    const location = unit ? getUnitRuntimeState(unit.id)?.location : undefined;
     if (!location) return;
     const view = olMap.getView();
     view.animate({
@@ -57,8 +58,9 @@ export const useGeoStore = create<GeoState>((set, get) => ({
     if (!olMap) return;
     const { duration = 900, maxZoom = 15 } = options;
     const points = units
-      .filter((u) => u._state?.location)
-      .map((u) => turfPoint(u._state?.location!));
+      .map((u) => getUnitRuntimeState(u.id)?.location)
+      .filter((location): location is Position => !!location)
+      .map((location) => turfPoint(location));
     if (!points.length) return;
     const c = featureCollection(points);
     get().zoomToGeometry(c, { duration, maxZoom });
@@ -91,7 +93,7 @@ export const useGeoStore = create<GeoState>((set, get) => ({
   panToUnit: (unit, duration = 900) => {
     const { olMap } = get();
     if (!olMap) return;
-    const location = unit?._state?.location;
+    const location = unit ? getUnitRuntimeState(unit.id)?.location : undefined;
     if (!location) return;
     const view = olMap.getView();
     view.animate({

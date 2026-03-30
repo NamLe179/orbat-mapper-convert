@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { memo, useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { PanelLeftOpen as ShowPanelIcon, Search as MagnifyingGlassIcon } from "lucide-react";
 import { useMediaQuery } from "usehooks-ts";
 
@@ -13,9 +13,8 @@ import {
 } from "@/components/injects";
 import { useUiStore } from "@/stores/uiStore";
 import { usePlaybackStore } from "@/stores/playbackStore";
-import { useSelectedItems } from "@/stores/selectedStore";
+import { useSelectedItems, useSelectedStore } from "@/stores/selectedStore";
 import { useMainToolbarStore } from "@/stores/mainToolbarStore";
-import { useActiveUnit } from "@/stores/dragStore";
 
 // Components
 import ScenarioMap from "@/components/ScenarioMap";
@@ -46,30 +45,106 @@ import Select from "ol/interaction/Select";
 
 const FRAME_INTERVAL = 1000 / 60;
 
+const MemoizedMapEditorDesktopPanel = memo(MapEditorDesktopPanel);
+const MemoizedMapEditorDetailsPanel = memo(MapEditorDetailsPanel);
+const MemoizedMapTimeController = memo(MapTimeController);
+
+function PlaybackController({ scn }: { scn: ReturnType<typeof useActiveScenario> }) {
+  const playbackRunning = usePlaybackStore((s) => s.playbackRunning);
+  const playbackSpeed = usePlaybackStore((s) => s.playbackSpeed);
+  const playbackLooping = usePlaybackStore((s) => s.playbackLooping);
+  const startMarker = usePlaybackStore((s) => s.startMarker);
+  const endMarker = usePlaybackStore((s) => s.endMarker);
+
+  const rafRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef(0);
+  const scnRef = useRef(scn);
+  const playbackRunningRef = useRef(playbackRunning);
+  const playbackSpeedRef = useRef(playbackSpeed);
+  const playbackLoopingRef = useRef(playbackLooping);
+  const startMarkerRef = useRef(startMarker);
+  const endMarkerRef = useRef(endMarker);
+
+  useEffect(() => {
+    scnRef.current = scn;
+  }, [scn]);
+
+  useEffect(() => {
+    playbackRunningRef.current = playbackRunning;
+  }, [playbackRunning]);
+
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed;
+  }, [playbackSpeed]);
+
+  useEffect(() => {
+    playbackLoopingRef.current = playbackLooping;
+  }, [playbackLooping]);
+
+  useEffect(() => {
+    startMarkerRef.current = startMarker;
+  }, [startMarker]);
+
+  useEffect(() => {
+    endMarkerRef.current = endMarker;
+  }, [endMarker]);
+
+  const updatePlayback = useCallback(() => {
+    if (!playbackRunningRef.current) return;
+
+    const now = performance.now();
+    if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
+      rafRef.current = requestAnimationFrame(updatePlayback);
+      return;
+    }
+    lastFrameTimeRef.current = now;
+
+    const scenario = scnRef.current;
+    const currentTime = scenario.store.state.currentTime;
+
+    if (
+      playbackLoopingRef.current &&
+      endMarkerRef.current !== undefined &&
+      startMarkerRef.current !== undefined &&
+      currentTime >= endMarkerRef.current
+    ) {
+      scenario.time.setCurrentTime(startMarkerRef.current);
+    } else {
+      scenario.time.setCurrentTime(currentTime + playbackSpeedRef.current);
+    }
+
+    rafRef.current = requestAnimationFrame(updatePlayback);
+  }, []);
+
+  useEffect(() => {
+    if (playbackRunning) {
+      lastFrameTimeRef.current = 0;
+      rafRef.current = requestAnimationFrame(updatePlayback);
+    } else if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+    }
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [playbackRunning, updatePlayback]);
+
+  return null;
+}
+
 export default function ScenarioEditorMap({ 
   onShowSettings 
 }: { onShowSettings?: () => void }) {
   const scn = useActiveScenario();
   const ui = useUiStore();
-  const playback = usePlaybackStore();
   const toolbarStore = useMainToolbarStore();
-  const activeUnit = useActiveUnit();
   const isMobile = useMediaQuery("(max-width: 768px)");
 
   // --- Refs & Shallow States ---
   const [mapInstance, setMapInstance] = useState<OLMap | null>(null);
   const [selectInteraction, setSelectInteraction] = useState<Select | null>(null);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const rafRef = useRef<number | null>(null);
-  const lastFrameTimeRef = useRef(0);
-  const playbackRef = useRef(playback);
-  const scnRef = useRef(scn);
   const { getModalTimestamp } = useTimeModal();
-
-  useEffect(() => {
-    playbackRef.current = playback;
-    scnRef.current = scn;
-  });
   
   // Handler for opening settings panel
   const handleShowSettings = useCallback(() => {
@@ -108,55 +183,11 @@ export default function ScenarioEditorMap({
     setSelectInteraction(featureSelectInteraction);
   }, []);
 
-  // --- Playback Loop (useRafFn replacement) ---
-  const updatePlayback = useCallback(() => {
-    const pb = playbackRef.current;
-    const scenario = scnRef.current;
-
-    if (!pb.playbackRunning) return;
-
-    const now = performance.now();
-    if (now - lastFrameTimeRef.current < FRAME_INTERVAL) {
-      rafRef.current = requestAnimationFrame(updatePlayback);
-      return;
-    }
-    lastFrameTimeRef.current = now;
-
-    if (
-      pb.playbackLooping &&
-      pb.endMarker !== undefined &&
-      pb.startMarker !== undefined
-    ) {
-      if (scenario.store.state.currentTime >= pb.endMarker) {
-        scenario.time.setCurrentTime(pb.startMarker);
-        rafRef.current = requestAnimationFrame(updatePlayback);
-        return;
-      }
-    }
-
-    const newTime = scenario.store.state.currentTime + pb.playbackSpeed;
-    scenario.time.setCurrentTime(newTime);
-
-    rafRef.current = requestAnimationFrame(updatePlayback);
-  }, []);
-
-  useEffect(() => {
-    if (playback.playbackRunning) {
-      lastFrameTimeRef.current = 0;
-      rafRef.current = requestAnimationFrame(updatePlayback);
-    } else {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    }
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [playback.playbackRunning]);
-
   // --- Cleanup ---
   useEffect(() => {
     return () => {
-      activeUnit.clearActiveUnit();
-      playback.togglePlayback(false);
+      useSelectedStore.getState().clear();
+      usePlaybackStore.getState().togglePlayback(false);
     };
   }, []);
 
@@ -173,6 +204,7 @@ export default function ScenarioEditorMap({
   return (
     <ActiveMapContext.Provider value={mapInstance}>
       <ActiveFeatureSelectInteractionContext.Provider value={selectInteraction}>
+        <PlaybackController scn={scn} />
         <div className="flex flex-col h-full w-full" data-component="ScenarioEditorMap">
           {/* Map Container - takes remaining space */}
           <div className="relative flex-1 min-h-0" data-component="map-wrapper">
@@ -195,7 +227,7 @@ export default function ScenarioEditorMap({
             <main className="pointer-events-none absolute inset-0 flex flex-col justify-between">
               <header className="flex flex-none items-center justify-end p-2">
                 <div className="pointer-events-auto">
-                  <MapTimeController
+                  <MemoizedMapTimeController
                     showControls={isMobile ? ui.mobilePanelOpen : false}
                     onOpenTimeModal={openTimeDialog}
                     onShowSettings={handleShowSettings}
@@ -217,20 +249,20 @@ export default function ScenarioEditorMap({
               {/* Left Panel - absolute positioned at top-left */}
               {!isMobile && ui.showLeftPanel && (
                 <div className="absolute top-2 left-2 pointer-events-auto">
-                  <MapEditorDesktopPanel onClose={() => ui.setShowLeftPanel(false)} />
+                  <MemoizedMapEditorDesktopPanel onClose={() => ui.setShowLeftPanel(false)} />
                 </div>
               )}
 
               {/* Details Panel - absolute positioned at top-right, below header */}
               {showDetailsPanel && (
                 <div className="absolute top-20 right-2 pointer-events-auto">
-                  <MapEditorDetailsPanel onClose={clearSelected}>
+                  <MemoizedMapEditorDetailsPanel onClose={clearSelected}>
                     {activeDetailsPanel === "feature" && <ScenarioFeatureDetails selectedIds={new Set(Array.from(selectedFeatureIds).map(id => id.toString()))} />}
                     {activeDetailsPanel === "unit" && <UnitDetails unitId={activeUnitId || Array.from(selectedUnitIds)[0]} />}
                     {activeDetailsPanel === "event" && <ScenarioEventDetails eventId={activeScenarioEventId!} />}
                     {activeDetailsPanel === "mapLayer" && <ScenarioMapLayerDetails layerId={activeMapLayerId!} />}
                     {activeDetailsPanel === "scenario" && <ScenarioInfoPanel />}
-                  </MapEditorDetailsPanel>
+                  </MemoizedMapEditorDetailsPanel>
                 </div>
               )}
             </main>

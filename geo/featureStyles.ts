@@ -45,6 +45,8 @@ const defaultStyle = new Style({
   }),
 });
 
+const globalStyleCache = new Map<FeatureId, Style>();
+
 // --- Main Factory Function ---
 
 /**
@@ -67,10 +69,8 @@ export function useFeatureStyles(geo?: TGeo) {
           invalidateStyle: () => {},
       }
   }
-  const styleCache = new Map<FeatureId, Style>();
-
   function clearCache() {
-    styleCache.clear();
+    globalStyleCache.clear();
   }
 
   function scenarioFeatureStyle(
@@ -79,7 +79,7 @@ export function useFeatureStyles(geo?: TGeo) {
     overrideLimitVisibility = false,
   ) {
     const featureId = feature.getId() as FeatureId;
-    let style = styleCache.get(featureId);
+    let style = globalStyleCache.get(featureId);
 
     // Lấy thông tin feature từ store (geo)
     const geoFeature = activeGeo.getFeatureById(featureId);
@@ -110,7 +110,7 @@ export function useFeatureStyles(geo?: TGeo) {
       // @ts-ignore: OpenLayers features allow arbitrary properties, but types might be strict
       feature.set("_zIndex", scenarioFeature.meta._zIndex, true);
       
-      styleCache.set(featureId, style);
+      globalStyleCache.set(featureId, style);
     }
 
     // 2. Kiểm tra Visibility dựa trên Zoom/Resolution
@@ -148,7 +148,7 @@ export function useFeatureStyles(geo?: TGeo) {
   }
 
   function invalidateStyle(featureId: FeatureId) {
-    styleCache.delete(featureId);
+    globalStyleCache.delete(featureId);
   }
 
   return {

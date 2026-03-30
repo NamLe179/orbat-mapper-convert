@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import type { EntityId } from "@/types/base";
 import type { BreadcrumbItemType } from "@/modules/scenarioeditor/types";
 import type { NSide, NSideGroup, NUnit } from "@/types/internalModels";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 export default function UnitBreadcrumbs() {
   const {
@@ -90,14 +91,14 @@ export default function UnitBreadcrumbs() {
         return {
           name: uunit.shortName || uunit.name,
           sidc: uunit.sidc || "",
-          location: Boolean(uunit._state?.location),
+          location: Boolean(getUnitRuntimeState(uunit.id)?.location),
           id: uunit.id,
           symbolOptions: unitActions.getCombinedSymbolOptions(uunit),
           items: [
             ...parent.subUnits.map(getUnitById).map((subUnit) => ({
               ...subUnit,
               symbolOptions: unitActions.getCombinedSymbolOptions(subUnit),
-              location: Boolean(subUnit._state?.location),
+              location: Boolean(getUnitRuntimeState(subUnit.id)?.location),
             })),
             ...("groups" in parent
               ? side.groups.map((group) => getSideGroupById(group))
@@ -142,7 +143,7 @@ export default function UnitBreadcrumbs() {
             return {
               ...unit,
               symbolOptions: unitActions.getCombinedSymbolOptions(unit as any),
-              location: Boolean(unit._state?.location),
+              location: Boolean(getUnitRuntimeState(unit.id)?.location),
             };
           }),
         });

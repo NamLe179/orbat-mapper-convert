@@ -90,30 +90,38 @@ export default function LandingPageScenarios() {
 
       <section className="mx-auto max-w-7xl p-6">
         <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {DEMO_SCENARIOS.map((scenario) => (
-            <li
-              key={scenario.name}
-              className="col-span-1 flex flex-col divide-y divide-border overflow-hidden rounded-lg border bg-card text-center text-card-foreground shadow-sm focus-within:border-primary"
-            >
-              <Link
-                href={getScenarioTo(scenario.id)}
-                className="flex flex-1 flex-col"
-                draggable="false"
+          {DEMO_SCENARIOS.map((scenario) => {
+            const imageUrl = scenario.imageUrl?.trim();
+
+            return (
+              <li
+                key={scenario.name}
+                className="col-span-1 flex flex-col divide-y divide-border overflow-hidden rounded-lg border bg-card text-center text-card-foreground shadow-sm focus-within:border-primary"
               >
-                <img
-                  className="mx-auto h-52 w-full shrink-0 bg-muted object-cover object-top"
-                  src={scenario.imageUrl}
-                  alt=""
+                <Link
+                  href={getScenarioTo(scenario.id)}
+                  className="flex flex-1 flex-col"
                   draggable="false"
-                />
-                <h3 className="mt-6 text-sm font-medium text-heading">{scenario.name}</h3>
-                <dl className="mt-1 flex grow flex-col justify-between p-4">
-                  <dt className="sr-only">Summary</dt>
-                  <dd className="text-sm text-muted-foreground">{scenario.summary}</dd>
-                </dl>
-              </Link>
-            </li>
-          ))}
+                >
+                  {imageUrl ? (
+                    <img
+                      className="mx-auto h-52 w-full shrink-0 bg-muted object-cover object-top"
+                      src={imageUrl}
+                      alt={scenario.name}
+                      draggable="false"
+                    />
+                  ) : (
+                    <div className="mx-auto h-52 w-full shrink-0 bg-muted" aria-hidden="true" />
+                  )}
+                  <h3 className="mt-6 text-sm font-medium text-heading">{scenario.name}</h3>
+                  <dl className="mt-1 flex grow flex-col justify-between p-4">
+                    <dt className="sr-only">Summary</dt>
+                    <dd className="text-sm text-muted-foreground">{scenario.summary}</dd>
+                  </dl>
+                </Link>
+              </li>
+            );
+          })}
 
           <li className="col-span-1 flex">
             <button

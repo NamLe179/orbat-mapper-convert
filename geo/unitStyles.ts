@@ -8,6 +8,7 @@ import { hashObject, wordWrap } from "@/utils";
 import type { MapSettingsState } from "@/stores/mapSettingsStore";
 import type { TScenario } from "@/scenariostore";
 import { CUSTOM_SYMBOL_PREFIX, CUSTOM_SYMBOL_SLICE } from "@/config/constants";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 export type UnitLabelData = {
   yOffset: number;
@@ -69,7 +70,8 @@ export function createUnitStyle(
   color?: string,
 ): { style: Style; cacheKey: string } {
   const { name = "", shortName = "" } = unit;
-  const sidc = unit._state?.sidc || unit.sidc;
+  const runtimeState = getUnitRuntimeState(unit.id);
+  const sidc = runtimeState?.sidc || unit.sidc;
 
   const { uniqueDesignation = shortName || name, ...textAmplifiers } =
     unit.textAmplifiers || {};

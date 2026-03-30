@@ -5,6 +5,7 @@ import { useActiveScenario } from "@/components/injects";
 import { useSelectedItems } from "@/stores/selectedStore";
 import { useEquipmentEditStore, useSuppliesEditStore } from "@/stores/toeStore";
 import { useUiStore } from "@/stores/uiStore";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 import { useUnitSupplyTableStore } from "@/stores/tableStores";
 import { asPercent, useToeEditableItems } from "@/hooks/toeUtils";
 
@@ -105,7 +106,7 @@ export default function UnitDetailsSupplies({ unit, isLocked = false }: Props) {
     allUnitIds.forEach((unitId) => {
       const u = unitMap[unitId];
       if (!u) return;
-      const supplies = u._state?.supplies ?? u.supplies ?? [];
+      const supplies = getUnitRuntimeState(u.id)?.supplies ?? u.supplies ?? [];
 
       supplies.forEach((e) => {
         const current = aggSupplies[e.id] || { count: 0, onHand: 0 };

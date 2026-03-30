@@ -5,6 +5,7 @@ import fuzzysort from "fuzzysort";
 import type { NUnit } from "@/types/internalModels";
 import { groupBy, htmlTagEscape } from "@/utils"; // Utils cần convert sang TS thuần
 import { useActiveScenario } from "@/components/injects"; // Context hook
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 import type {
   ActionSearchResult,
   EventSearchResult,
@@ -117,7 +118,7 @@ export function useScenarioSearch(
       .filter((h) => {
         if (limitToPosition) {
           const u = getUnitById(h.obj.id);
-          return !!u?._state?.location;
+            return !!(u && getUnitRuntimeState(u.id)?.location);
         }
         return true;
       })
@@ -148,7 +149,7 @@ export function useScenarioSearch(
           score: u.score,
           category: "Units",
           symbolOptions: unitActions.getCombinedSymbolOptions(u.obj),
-          _state: u.obj._state,
+            _state: getUnitRuntimeState(u.obj.id),
         } as UnitSearchResult;
       });
   }, [unitActions, getUnitById]);

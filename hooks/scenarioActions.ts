@@ -19,6 +19,7 @@ import { useGeoStore } from "@/stores/geoStore";
 import { useSelectedItems } from "@/stores/selectedStore";
 import { useScenarioInfoPanelStore } from "@/stores/scenarioInfoPanelStore";
 import { useUiStore } from "@/stores/uiStore";
+import { getUnitRuntimeState } from "@/scenariostore/runtimeState";
 
 // --- HOOK 1: Unit Actions ---
 
@@ -58,7 +59,7 @@ export function useUnitActions() {
     }
 
     if (action === UnitActions.Zoom) {
-      if (unit._state?.location) {
+      if (getUnitRuntimeState(unit.id)?.location) {
         geoStore.zoomToUnit(unit, 0);
       } else {
         const subUnits: NUnit[] = [];
@@ -70,9 +71,9 @@ export function useUnitActions() {
           {},
         );
         const locations = subUnits
-          .filter((u) => u._state?.location)
+          .filter((u) => getUnitRuntimeState(u.id)?.location)
           // @ts-ignore
-          .map((u) => u._state?.location);
+          .map((u) => getUnitRuntimeState(u.id)?.location);
 
         if (locations.length > 0) {
           // @ts-ignore: Turf types mismatch sometimes
@@ -178,7 +179,7 @@ export function useUnitMenu(
   // React Memo to re-calculate menu items only when dependencies change
   const unitMenuItems = useMemo((): MenuItemData<UnitAction>[] => {
     const hasChildren = Boolean(unit.subUnits && unit.subUnits.length);
-    const hasLocation = Boolean(unit._state?.location);
+    const hasLocation = Boolean(getUnitRuntimeState(unit.id)?.location);
 
     return [
       {

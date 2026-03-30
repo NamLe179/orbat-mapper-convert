@@ -54,6 +54,7 @@ import { klona } from "klona";
 import { nanoid } from "@/utils";
 import { resolveTimeZone } from "@/utils/militaryTimeZones";
 import { invalidateUnitStyle } from "@/geo/unitStyles";
+import { featureRuntimeState, unitRuntimeState } from "@/scenariostore/runtimeState";
 
 // Types
 import type { NewScenarioStore } from "./newScenarioStore";
@@ -79,7 +80,6 @@ export type GoToScenarioEventEvent = {
   event: NScenarioEvent;
 };
 
-const TIME_DERIVED_STATE_LABEL = "setTimeDerivedState";
 const TIME_SCRUB_LABEL = "setCurrentTime:scrub";
 
 // --- Helpers ---
@@ -292,11 +292,23 @@ function getFeatureStateCache(feature: NScenarioFeature): FeatureStateCacheEntry
 }
 
 export function updateCurrentUnitState(unit: NUnit, timestamp: number) {
+  const currentState = computeUnitStateForTimestamp(unit, timestamp);
+  const prevState = unitRuntimeState.get(unit.id);
+
+  if (currentState?.sidc !== prevState?.sidc) {
+    invalidateUnitStyle(unit.id);
+  }
+
+  unitRuntimeState.set(unit.id, currentState);
+  return currentState;
+}
+
+function computeUnitStateForTimestamp(
+  unit: NUnit,
+  timestamp: number,
+): CurrentState | null {
   if (!unit.state || !unit.state.length) {
-    if (!unit._state) {
-      unit._state = createInitialState(unit);
-    }
-    return;
+    return createInitialState(unit);
   }
 
   const { timestamps, prefixStates } = getUnitStateCache(unit);
@@ -346,11 +358,7 @@ export function updateCurrentUnitState(unit: NUnit, timestamp: number) {
     };
   }
 
-  if (currentState?.sidc !== unit._state?.sidc) {
-    unit._ikey = undefined;
-    invalidateUnitStyle(unit.id);
-  }
-  unit._state = currentState;
+  return currentState;
 }
 
 function createInitialFeatureState(
@@ -362,6 +370,19 @@ function createInitialFeatureState(
   };
 }
 
+function computeFeatureStateForTimestamp(
+  feature: NScenarioFeature,
+  timestamp: number,
+): CurrentScenarioFeatureState | null {
+  if (!feature.state?.length) {
+    return createInitialFeatureState(feature);
+  }
+
+  const { timestamps, prefixStates } = getFeatureStateCache(feature);
+  const idx = findLastStateIndex(timestamps, timestamp);
+  return idx >= 0 ? prefixStates[idx] : createInitialFeatureState(feature);
+}
+
 // --- Logic Hook/Factory ---
 
 export function useScenarioTime(store: NewScenarioStore) {
@@ -370,17 +391,23 @@ export function useScenarioTime(store: NewScenarioStore) {
   const goToScenarioEventHook = createEventHook<GoToScenarioEventEvent>();
 
   function setCurrentTime(timestamp: number) {
-    if (store.state.currentTime === timestamp) return;
+    const sameTimestamp = store.state.currentTime === timestamp;
+
+    for (const unitId in store.state.unitMap) {
+      const unit = store.state.unitMap[unitId];
+      if (!unit) continue;
+      updateCurrentUnitState(unit, timestamp);
+    }
+
+    for (const featureId in store.state.featureMap) {
+      const feature = store.state.featureMap[featureId];
+      if (!feature) continue;
+      featureRuntimeState.set(featureId, computeFeatureStateForTimestamp(feature, timestamp));
+    }
+
+    if (sameTimestamp) return;
 
     update((s) => {
-      // Update Units
-      for (const unitId in s.unitMap) {
-        const unit = s.unitMap[unitId];
-        if (unit) {
-          updateCurrentUnitState(unit, timestamp);
-        }
-      }
-      
       // Update Layers
       for (const layerId in s.layerMap) {
         const layer = s.layerMap[layerId];
@@ -402,16 +429,10 @@ export function useScenarioTime(store: NewScenarioStore) {
           timestamp >= featVisibleUntilT ||
           !!feature.meta.isHidden;
 
-        if (feature.state?.length) {
-          const { timestamps, prefixStates } = getFeatureStateCache(feature);
-          const idx = findLastStateIndex(timestamps, timestamp);
-          feature._state = idx >= 0 ? prefixStates[idx] : createInitialFeatureState(feature);
-        }
       }
-    }, { label: TIME_DERIVED_STATE_LABEL });
 
-    update((s) => {
       s.currentTime = timestamp;
+      s.unitStateCounter += 1;
     }, { label: TIME_SCRUB_LABEL });
   }
 
